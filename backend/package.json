@@ -1,0 +1,44 @@
+{
+  "name": "farmer-survey-backend",
+  "version": "1.0.0-alpha",
+  "description": "AI-enabled WhatsApp farmer survey platform backend",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node test-phase1.js",
+    "test:transitions": "node test-transitions.js",
+    "test:watch": "nodemon test-phase1.js",
+    "seed": "node scripts/seedDatabase.js",
+    "tts:diagnose": "node ./tools/tts-diagnostic.js",
+    "tts:generate": "node ./tools/run_tts_generate.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "survey",
+    "farmers",
+    "mongodb",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "exceljs": "^4.3.0",
+    "express": "^4.18.2",
+    "form-data": "^4.0.0",
+    "groq-sdk": "^0.3.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^6.21.0",
+    "multer": "^2.0.2",
+    "mongoose": "^8.18.0",
+    "reactflow": "^11.11.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

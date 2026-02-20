@@ -1,0 +1,349 @@
+
+[nodemon] 3.1.11
+[nodemon] to restart at any time, enter `rs`
+[nodemon] watching path(s): *.*
+[nodemon] watching extensions: js,mjs,cjs,json
+[nodemon] starting `node src/server.js`
+🔌 Initializing MongoDB connection...
+✅ MongoDB connection established
+✅ Audio storage directory ready
+📝 Initializing survey schema in MongoDB...
+✅ Survey schema initialized
+✅ Survey schema ensured on startup
+✅ WhatsApp configuration found. Phone number ID: 957978807400328
+✅ webhookEvents TTL index ensured (24h)
+✅ webhookDebug TTL index ensured (7d)
+📣 TTS provider: elevenlabs — available: true
+🚀 Server running on http://localhost:3000
+📬 WhatsApp webhook endpoint: https://freezingly-nonsignificative-edison.ngrok-free.dev/webhook
+📡 WhatsApp configured: true
+[2026-02-12T00:13:54.294Z] GET /api/farmers
+  Response: 304 (58ms)
+[2026-02-12T00:13:55.473Z] POST /api/whatsapp/invite
+  Body: {"channel":"phone","phoneNumber":"+916361005641"}
+✅ Continue/change buttons sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA==) 
+  Response: 200 (911ms)
+[2026-02-12T00:13:57.274Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA==","status":"sent","timestamp":"1770855237","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:13:57.276Z' }
+🧾 Webhook debug saved: 698d1b452b4fff0958106add from ::1
+  Response: 200 (64ms)
+[2026-02-12T00:13:57.635Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA==","status":"delivered","timestamp":"1770855237","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:13:57.636Z' }
+🧾 Webhook debug saved: 698d1b452b4fff0958106ade from ::1
+  Response: 200 (56ms)
+[2026-02-12T00:13:57.746Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA==","status":"delivered","timestamp":"1770855237","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:13:57.746Z' }
+🧾 Webhook debug saved: 698d1b452b4fff0958106adf from ::1
+  Response: 200 (59ms)
+[2026-02-12T00:13:59.002Z] GET /api/farmers
+  Response: 304 (67ms)
+[2026-02-12T00:14:00.865Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA==","status":"read","timestamp":"1770855241","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:00.866Z' }
+🧾 Webhook debug saved: 698d1b482b4fff0958106ae0 from ::1
+  Response: 200 (63ms)
+[2026-02-12T00:14:00.963Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQkJCMzE5MzJDMTFCQTNDM0NGAA==","status":"read","timestamp":"1770855241","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:00.964Z' }
+🧾 Webhook debug saved: 698d1b482b4fff0958106ae1 from ::1
+  Response: 200 (55ms)
+[2026-02-12T00:14:01.415Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+[2026-02-12T00:14:01.570Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDcxNTQyNzAxMUMyN0Y3NzcxRAA=","timestamp":"1770855241","type":"interactive","interactive":{"type":"button_reply","button_reply":{"id":"action_change_lang","title":"Choose language"}}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:01.570Z' }
+🧾 Webhook debug saved: 698d1b492b4fff0958106ae2 from ::1
+📞 Message from 916361005641 (normalized: +916361005641): {"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDcxNTQyNzAxMUMyN0Y3NzcxRAA=","timestamp":"1770855241","type":"interactive","interactive":{"type":"button_reply","button_reply":{"id":"action_change_lang","title":"Choose language"}}}
+🧾 Stored interactive debug id=698d1b492b4fff0958106ae4 replyId=action_change_lang phone=+916361005641
+  Response: 200 (432ms)
+🔔 Interactive reply id=action_change_lang from +916361005641 (farmerExists=true, activeSession=true)
+🔔 Action reply received: action_change_lang from +916361005641
+✅ Language selection sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA==)      
+[2026-02-12T00:14:03.776Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA==","status":"sent","timestamp":"1770855243","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:03.792Z' }
+🧾 Webhook debug saved: 698d1b4b2b4fff0958106ae5 from ::1
+  Response: 200 (67ms)
+[2026-02-12T00:14:03.999Z] GET /api/farmers
+[2026-02-12T00:14:04.047Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA==","status":"delivered","timestamp":"1770855244","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:04.049Z' }
+  Response: 304 (119ms)
+🧾 Webhook debug saved: 698d1b4c2b4fff0958106ae6 from ::1
+  Response: 200 (110ms)
+[2026-02-12T00:14:04.863Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA==","status":"read","timestamp":"1770855245","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:04.864Z' }
+🧾 Webhook debug saved: 698d1b4c2b4fff0958106ae7 from ::1
+  Response: 200 (66ms)
+[2026-02-12T00:14:08.998Z] GET /api/farmers
+  Response: 304 (57ms)
+[2026-02-12T00:14:11.431Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (444ms)
+[2026-02-12T00:14:13.027Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDVGMDkyQTA2QzhDMjMyM0MyMgA=","timestamp":"1770855252","type":"interactive","interactive":{"type":"list_reply","list_reply":{"id":"lang_english","title":"English"}}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:13.028Z' }
+🧾 Webhook debug saved: 698d1b552b4fff0958106ae8 from ::1
+📞 Message from 916361005641 (normalized: +916361005641): {"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDVGMDkyQTA2QzhDMjMyM0MyMgA=","timestamp":"1770855252","type":"interactive","interactive":{"type":"list_reply","list_reply":{"id":"lang_english","title":"English"}}}
+🧾 Stored interactive debug id=698d1b552b4fff0958106aea replyId=lang_english phone=+916361005641
+🔔 Interactive reply id=lang_english from +916361005641 (farmerExists=true, activeSession=true)
+🔄 Updated preferred language for +916361005641 -> english
+[2026-02-12T00:14:14.004Z] GET /api/farmers
+  Response: 200 (66ms)
+✅ Message sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTUzODJEQzcyODM4Nzg3MDMxAA==)
+✅ Mode selection buttons sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA==)  
+[2026-02-12T00:14:15.749Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTUzODJEQzcyODM4Nzg3MDMxAA==","status":"sent","timestamp":"1770855255","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:15.751Z' }
+🧾 Webhook debug saved: 698d1b572b4fff0958106aeb from ::1
+  Response: 200 (61ms)
+[2026-02-12T00:14:16.504Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA==","status":"sent","timestamp":"1770855256","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:16.504Z' }
+[2026-02-12T00:14:16.554Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTUzODJEQzcyODM4Nzg3MDMxAA==","status":"delivered","timestamp":"1770855256","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:16.554Z' }
+🧾 Webhook debug saved: 698d1b582b4fff0958106aec from ::1 
+  Response: 200 (61ms)
+🧾 Webhook debug saved: 698d1b582b4fff0958106aed from ::1
+  Response: 200 (52ms)
+[2026-02-12T00:14:16.704Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTUzODJEQzcyODM4Nzg3MDMxAA==","status":"read","timestamp":"1770855256","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:16.704Z' }
+🧾 Webhook debug saved: 698d1b582b4fff0958106aee from ::1
+  Response: 200 (51ms)
+[2026-02-12T00:14:16.766Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA==","status":"delivered","timestamp":"1770855256","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:16.767Z' }
+[2026-02-12T00:14:16.800Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTUzODJEQzcyODM4Nzg3MDMxAA==","status":"delivered","timestamp":"1770855256","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:16.801Z' }
+🧾 Webhook debug saved: 698d1b582b4fff0958106aef from ::1
+  Response: 200 (62ms)
+🧾 Webhook debug saved: 698d1b582b4fff0958106af0 from ::1
+  Response: 200 (53ms)
+[2026-02-12T00:14:17.505Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA==","status":"read","timestamp":"1770855257","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:17.506Z' }
+🧾 Webhook debug saved: 698d1b592b4fff0958106af1 from ::1
+  Response: 200 (63ms)
+[2026-02-12T00:14:19.002Z] GET /api/farmers
+  Response: 304 (80ms)
+[2026-02-12T00:14:20.869Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDk4MTQ0NDY1QTU3MjRGRDZGRQA=","timestamp":"1770855260","type":"interactive","interactive":{"type":"button_reply","button_reply":{"id":"action_mode_audio","title":"Audio"}}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:20.870Z' }
+🧾 Webhook debug saved: 698d1b5c2b4fff0958106af2 from ::1
+📞 Message from 916361005641 (normalized: +916361005641): {"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDk4MTQ0NDY1QTU3MjRGRDZGRQA=","timestamp":"1770855260","type":"interactive","interactive":{"type":"button_reply","button_reply":{"id":"action_mode_audio","title":"Audio"}}}      
+🧾 Stored interactive debug id=698d1b5d2b4fff0958106af4 replyId=action_mode_audio phone=+916361005641
+🔔 Interactive reply id=action_mode_audio from +916361005641 (farmerExists=true, activeSession=true)
+🔔 Action reply received: action_mode_audio from +916361005641
+🔄 Setting response mode for +916361005641 => audio       
+[2026-02-12T00:14:21.420Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (436ms)
+✅ Message sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQThFMjhGNDAxRTIzMTgzQTJCAA==)
+[2026-02-12T00:14:24.005Z] GET /api/farmers
+[2026-02-12T00:14:24.055Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQThFMjhGNDAxRTIzMTgzQTJCAA==","status":"sent","timestamp":"1770855263","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:24.056Z' }
+  Response: 304 (66ms)
+🧾 Webhook debug saved: 698d1b602b4fff0958106af5 from ::1
+  Response: 200 (55ms)
+[2026-02-12T00:14:24.116Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQThFMjhGNDAxRTIzMTgzQTJCAA==","status":"delivered","timestamp":"1770855264","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:24.120Z' }
+🧾 Webhook debug saved: 698d1b602b4fff0958106af6 from ::1
+  Response: 200 (51ms)
+[2026-02-12T00:14:24.219Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQThFMjhGNDAxRTIzMTgzQTJCAA==","status":"delivered","timestamp":"1770855264","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:24.232Z' }
+[2026-02-12T00:14:24.258Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQThFMjhGNDAxRTIzMTgzQTJCAA==","status":"read","timestamp":"1770855264","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:24.259Z' }
+🧾 Webhook debug saved: 698d1b602b4fff0958106af7 from ::1
+  Response: 200 (71ms)
+🧾 Webhook debug saved: 698d1b602b4fff0958106af8 from ::1 
+  Response: 200 (62ms)
+[2026-02-12T00:14:26.784Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjZBNUUwNDNGNUI3RTIzQTYyAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDcxNTQyNzAxMUMyN0Y3NzcxRAA=","timestamp":"1770855241","type":"interactive","interactive":{"type":"button_reply","button_reply":{"id":"action_change_lang","title":"Choose language"}}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:26.785Z' }
+🧾 Webhook debug saved: 698d1b622b4fff0958106af9 from ::1
+⚠️ Duplicate message ignored (db): wamid.HBgMOTE2MzYxMDA1NNjQxFQIAEhgWM0VCMDcxNTQyNzAxMUMyN0Y3NzcxRAA=
+  Response: 200 (100ms)
+📎 Uploading media to WhatsApp: {
+  filePath: 'C:\\Users\\chama\\OneDrive\\Desktop\\Farmers Servey AI\\backend\\audio_storage\\eleven_1770855267693_5kvp15.mp3',
+  fileName: 'eleven_1770855267693_5kvp15.mp3',
+  bytes: 148001,
+  mimeType: 'audio/mpeg'
+}
+[2026-02-12T00:14:29.001Z] GET /api/farmers
+  Response: 304 (66ms)
+📤 Sending WhatsApp audio message payload: {
+  to: '+916361005641',
+  mediaId: '763309743499016',
+  mimeType: 'audio/mpeg'
+}
+✅ Audio message sent: +916361005641 (mediaId: 763309743499016 id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNzIyMDMyQkI4MUE3OTA3QkQyAA==)
+📝 Sent first question: Q1 (lang=english)
+[2026-02-12T00:14:31.421Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+[2026-02-12T00:14:31.846Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNzIyMDMyQkI4MUE3OTA3QkQyAA==","status":"sent","timestamp":"1770855271","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:31.846Z' }
+  Response: 200 (454ms)
+🧾 Webhook debug saved: 698d1b672b4fff0958106afb from ::1
+  Response: 200 (57ms)
+[2026-02-12T00:14:32.335Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNzIyMDMyQkI4MUE3OTA3QkQyAA==","status":"delivered","timestamp":"1770855272","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:32.336Z' }
+🧾 Webhook debug saved: 698d1b682b4fff0958106afc from ::1
+  Response: 200 (60ms)
+[2026-02-12T00:14:32.410Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNzIyMDMyQkI4MUE3OTA3QkQyAA==","status":"delivered","timestamp":"1770855272","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:32.410Z' }
+🧾 Webhook debug saved: 698d1b682b4fff0958106afd from ::1
+  Response: 200 (51ms)
+[2026-02-12T00:14:32.929Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNzIyMDMyQkI4MUE3OTA3QkQyAA==","status":"read","timestamp":"1770855272","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:32.929Z' }
+🧾 Webhook debug saved: 698d1b682b4fff0958106afe from ::1
+  Response: 200 (58ms)
+[2026-02-12T00:14:33.999Z] GET /api/farmers
+  Response: 304 (64ms)
+[2026-02-12T00:14:38.342Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRjE0Q0Y4OTlBOEFBQUNBQ0RFAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDVGMDkyQTA2QzhDMjMyM0MyMgA=","timestamp":"1770855252","type":"interactive","interactive":{"type":"list_reply","list_reply":{"id":"lang_english","title":"English"}}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:38.342Z' }
+🧾 Webhook debug saved: 698d1b6e2b4fff0958106aff from ::1
+⚠️ Duplicate message ignored (db): wamid.HBgMOTE2MzYxMDA1NNjQxFQIAEhgWM0VCMDVGMDkyQTA2QzhDMjMyM0MyMgA=
+  Response: 200 (116ms)
+[2026-02-12T00:14:38.991Z] GET /api/farmers
+  Response: 304 (67ms)
+[2026-02-12T00:14:41.417Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (449ms)
+[2026-02-12T00:14:43.992Z] GET /api/farmers
+  Response: 304 (56ms)
+[2026-02-12T00:14:45.990Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"context":{"from":"15551488326","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDRDOEMxMEJCQTk1MkFBODEzAA=="},"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDk4MTQ0NDY1QTU3MjRGRDZGRQA=","timestamp":"1770855260","type":"interactive","interactive":{"type":"button_reply","button_reply":{"id":"action_mode_audio","title":"Audio"}}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:45.991Z' }
+🧾 Webhook debug saved: 698d1b752b4fff0958106b00 from ::1
+⚠️ Duplicate message ignored (db): wamid.HBgMOTE2MzYxMDA1NNjQxFQIAEhgWM0VCMDk4MTQ0NDY1QTU3MjRGRDZGRQA=
+  Response: 200 (108ms)
+[2026-02-12T00:14:49.011Z] GET /api/farmers
+  Response: 304 (68ms)
+[2026-02-12T00:14:50.789Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDY5QjRGOUFCQTc5NENCNEJEQwA=","timestamp":"1770855289","type":"audio","audio":{"mime_type":"audio/ogg; codecs=opus","sha256":"fEKv0uWsKZkdzjnKYc7wcywq3NT29lDLTV1JifJgQZc=","id":"1235475282060323","url":"https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1235475282060323&source=webhook&ext=1770855591&hash=ARl9aZ6k0yvNeBTBw4xvWKxZoF-s1qQg8MhogjYf_LvoXQ","voice":true}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:50.789Z' }
+🧾 Webhook debug saved: 698d1b7a2b4fff0958106b01 from ::1
+📞 Message from 916361005641 (normalized: +916361005641): {"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMDY5QjRGOUFCQTc5NENCNEJEQwA=","timestamp":"1770855289","type":"audio","audio":{"mime_type":"audio/ogg; codecs=opus","sha256":"fEKv0uWsKZkdzjnKYc7wcywq3NT29lDLTV1JifJgQZc=","id":"1235475282060323","url":"https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1235475282060323&source=webhook&ext=1770855591&hash=ARl9aZ6k0yvNeBTBw4xvWKxZoF-s1qQg8MhogjYf_LvoXQ","voice":true}}
+[2026-02-12T00:14:51.419Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (411ms)
+[2026-02-12T00:14:54.015Z] GET /api/farmers
+  Response: 304 (75ms)
+📎 Uploading media to WhatsApp: {
+  filePath: 'C:\\Users\\chama\\OneDrive\\Desktop\\Farmers Servey AI\\backend\\audio_storage\\eleven_1770855294162_rtyrl9.mp3',
+  fileName: 'eleven_1770855294162_rtyrl9.mp3',
+  bytes: 161376,
+  mimeType: 'audio/mpeg'
+}
+[2026-02-12T00:14:55.195Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"989588604125012","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551804452","phone_number_id":"927337227138030"},"contacts":[{"profile":{"name":"CHAMAN S"},"wa_id":"916361005641"}],"messages":[{"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMEIwRTZEOTc3RjIwNUY3ODVBNQA=","timestamp":"1770853192","text":{"body":"hi"},"type":"text"}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:55.196Z' }
+🧾 Webhook debug saved: 698d1b7f2b4fff0958106b04 from ::1
+📞 Message from 916361005641 (normalized: +916361005641): {"from":"916361005641","id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAEhgWM0VCMEIwRTZEOTc3RjIwNUY3ODVBNQA=","timestamp":"1770853192","text":{"body":"hi"},"type":"text"}
+📤 Sending WhatsApp audio message payload: {
+  to: '+916361005641',
+  mediaId: '884812434445939',
+  mimeType: 'audio/mpeg'
+}
+✅ Message sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDY2MzExMTJFMUE2REIzN0U3AA==)
+  Response: 200 (1355ms)
+[2026-02-12T00:14:57.369Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDY2MzExMTJFMUE2REIzN0U3AA==","status":"sent","timestamp":"1770855297","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:57.370Z' }
+✅ Audio message sent: +916361005641 (mediaId: 884812434445939 id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTAxQUU0Q0FCMEUyRDgwQ0YyAA==)
+📝 Sent first question: Q1 (lang=english)
+🧾 Webhook debug saved: 698d1b812b4fff0958106b06 from ::1
+  Response: 200 (51ms)
+[2026-02-12T00:14:57.664Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDY2MzExMTJFMUE2REIzN0U3AA==","status":"delivered","timestamp":"1770855297","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:57.665Z' }
+🧾 Webhook debug saved: 698d1b812b4fff0958106b07 from ::1
+  Response: 200 (53ms)
+[2026-02-12T00:14:57.753Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDY2MzExMTJFMUE2REIzN0U3AA==","status":"delivered","timestamp":"1770855298","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:57.754Z' }
+🧾 Webhook debug saved: 698d1b812b4fff0958106b08 from ::1
+  Response: 200 (55ms)
+[2026-02-12T00:14:58.201Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRDY2MzExMTJFMUE2REIzN0U3AA==","status":"read","timestamp":"1770855298","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:58.249Z' }
+✅ Message sent: +916361005641 (id: wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNTRCQjJCNjk1MjNDMjkyMTU3AA==)
+  Response: 200 (7521ms)
+🧾 Webhook debug saved: 698d1b822b4fff0958106b09 from ::1
+  Response: 200 (69ms)
+[2026-02-12T00:14:59.002Z] GET /api/farmers
+[2026-02-12T00:14:59.051Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTAxQUU0Q0FCMEUyRDgwQ0YyAA==","status":"sent","timestamp":"1770855299","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:59.052Z' }
+  Response: 304 (54ms)
+🧾 Webhook debug saved: 698d1b832b4fff0958106b0a from ::1
+  Response: 200 (63ms)
+[2026-02-12T00:14:59.317Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNTRCQjJCNjk1MjNDMjkyMTU3AA==","status":"sent","timestamp":"1770855299","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:59.318Z' }
+🧾 Webhook debug saved: 698d1b832b4fff0958106b0b from ::1
+  Response: 200 (64ms)
+[2026-02-12T00:14:59.521Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTAxQUU0Q0FCMEUyRDgwQ0YyAA==","status":"delivered","timestamp":"1770855299","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:59.522Z' }
+🧾 Webhook debug saved: 698d1b832b4fff0958106b0c from ::1
+  Response: 200 (61ms)
+[2026-02-12T00:14:59.594Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNTRCQjJCNjk1MjNDMjkyMTU3AA==","status":"delivered","timestamp":"1770855299","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:14:59.595Z' }
+🧾 Webhook debug saved: 698d1b832b4fff0958106b0d from ::1
+  Response: 200 (67ms)
+[2026-02-12T00:15:00.105Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSRTAxQUU0Q0FCMEUyRDgwQ0YyAA==","status":"read","timestamp":"1770855300","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:15:00.105Z' }
+🧾 Webhook debug saved: 698d1b842b4fff0958106b0e from ::1
+  Response: 200 (64ms)
+[2026-02-12T00:15:00.710Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNTRCQjJCNjk1MjNDMjkyMTU3AA==","status":"read","timestamp":"1770855300","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:15:00.710Z' }
+🧾 Webhook debug saved: 698d1b842b4fff0958106b0f from ::1
+  Response: 200 (56ms)
+[2026-02-12T00:15:01.423Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (434ms)
+[2026-02-12T00:15:03.876Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSNkMzMjdEMTM5RjUxQkMzMDBGAA==","status":"sent","timestamp":"1770854904","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:15:03.876Z' }
+🧾 Webhook debug saved: 698d1b872b4fff0958106b10 from ::1
+  Response: 200 (61ms)
+[2026-02-12T00:15:03.996Z] GET /api/farmers
+  Response: 304 (61ms)
+[2026-02-12T00:15:09.289Z] GET /api/farmers
+  Response: 304 (55ms)
+[2026-02-12T00:15:12.590Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (469ms)
+[2026-02-12T00:15:14.316Z] GET /api/farmers
+  Response: 304 (59ms)
+[2026-02-12T00:15:18.496Z] POST /webhook
+  Body: {"object":"whatsapp_business_account","entry":[{"id":"832166923194194","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"display_phone_number":"15551488326","phone_number_id":"957978807400328"},"statuses":[{"id":"wamid.HBgMOTE2MzYxMDA1NjQxFQIAERgSQTJBQUVEQjlDMUNDNEE3Q0I1AA==","status":"delivered","timestamp":"1770854991","recipient_id":"916361005641","pricing":{"billable":false,"pricing_model":"PMP","category":"service","type":"free_customer_service"}}]},"field":"messages"}]}]}
+🔔 handleIncomingMessage invoked { path: '/', ip: '::1', time: '2026-02-12T00:15:18.497Z' }
+🧾 Webhook debug saved: 698d1b962b4fff0958106b11 from ::1
+  Response: 200 (68ms)
+[2026-02-12T00:15:19.287Z] GET /api/farmers
+  Response: 304 (61ms)
+[2026-02-12T00:15:22.299Z] GET /api/analytics/kpis
+  Query: {"range":"weekly"}
+  Response: 200 (500ms)
+[2026-02-12T00:15:24.
