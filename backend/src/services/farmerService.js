@@ -7,6 +7,199 @@ const getCollection = (name) => getModelByCollection(name).collection;
 const DEFAULT_SURVEY_ID = 'survey1';
 
 const toMapKey = (phone, surveyId) => `${String(phone || '').trim()}::${String(surveyId || DEFAULT_SURVEY_ID).trim() || DEFAULT_SURVEY_ID}`;
+const normalizeSurveyId = (surveyId) => String(surveyId || DEFAULT_SURVEY_ID).trim() || DEFAULT_SURVEY_ID;
+
+const normalizePhoneNumber = (input) => {
+    if (input === null || input === undefined) return null;
+
+    let value = String(input).trim();
+    if (!value) return null;
+
+    value = value.replace(/[\u200E\u200F\u202A-\u202E\s\-().]/g, '');
+    if (value.startsWith('00')) {
+        value = `+${value.slice(2)}`;
+    }
+
+    const hasPlusPrefix = value.startsWith('+');
+    const digitsOnly = value.replace(/\D/g, '');
+
+    if (!digitsOnly) return null;
+
+    if (hasPlusPrefix) {
+        return `+${digitsOnly}`;
+    }
+
+    if (digitsOnly.length >= 10) {
+        return `+${digitsOnly}`;
+    }
+
+    return null;
+};
+
+const parseCsvLine = (line) => {
+    const values = [];
+    let currentValue = '';
+    let insideQuotes = false;
+
+    for (let index = 0; index < line.length; index += 1) {
+        const character = line[index];
+
+        if (character === '"') {
+            if (insideQuotes && line[index + 1] === '"') {
+                currentValue += '"';
+                index += 1;
+            } else {
+                insideQuotes = !insideQuotes;
+            }
+            continue;
+        }
+
+        if (character === ',' && !insideQuotes) {
+            values.push(currentValue.trim());
+            currentValue = '';
+            continue;
+        }
+
+        currentValue += character;
+    }
+
+    values.push(currentValue.trim());
+    return values;
+};
+
+const parseFarmersFromCsv = (rawCsv = '') => {
+    const lines = String(rawCsv || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lines.length === 0) return [];
+
+    const headerColumns = parseCsvLine(lines[0]).map((value) => value.toLowerCase().trim());
+    const hasHeader = headerColumns.some((column) => ['phone', 'phone_number', 'phonenumber', 'mobile', 'number', 'language', 'region'].includes(column));
+
+    const phoneColumnIndex = hasHeader
+        ? headerColumns.findIndex((column) => ['phone', 'phone_number', 'phonenumber', 'mobile', 'number'].includes(column))
+        : -1;
+    const languageColumnIndex = hasHeader
+        ? headerColumns.findIndex((column) => ['language', 'preferredlanguage', 'preferred_language'].includes(column))
+        : -1;
+    const regionColumnIndex = hasHeader
+        ? headerColumns.findIndex((column) => ['region', 'state', 'district', 'location'].includes(column))
+        : -1;
+
+    const startRow = hasHeader ? 1 : 0;
+    const rows = [];
+
+    for (let lineIndex = startRow; lineIndex < lines.length; lineIndex += 1) {
+        const row = parseCsvLine(lines[lineIndex]);
+        if (row.length === 0) continue;
+
+        const rawPhone = phoneColumnIndex >= 0 ? row[phoneColumnIndex] : row[0];
+        const phoneNumber = normalizePhoneNumber(rawPhone);
+        if (!phoneNumber) continue;
+
+        const preferredLanguage = languageColumnIndex >= 0 ? String(row[languageColumnIndex] || '').trim().toLowerCase() : '';
+        const region = regionColumnIndex >= 0 ? String(row[regionColumnIndex] || '').trim().toLowerCase() : '';
+
+        rows.push({
+            phoneNumber,
+            ...(preferredLanguage ? { preferredLanguage } : {}),
+            ...(region ? { region } : {}),
+        });
+    }
+
+    return rows;
+};
+
+const buildSurveyMatch = (surveyId) => {
+    const normalizedSurveyId = normalizeSurveyId(surveyId);
+    if (normalizedSurveyId === DEFAULT_SURVEY_ID) {
+        return {
+            $or: [
+                { surveyId: DEFAULT_SURVEY_ID },
+                { surveyId: { $exists: false } },
+            ],
+        };
+    }
+
+    return { surveyId: normalizedSurveyId };
+};
+
+const normalizeSelectedOption = (selectedOption) => {
+    if (typeof selectedOption !== 'string') return null;
+    const normalized = selectedOption.trim().toLowerCase();
+    return normalized || null;
+};
+
+const parseSelectedOptionIndex = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.trunc(parsed);
+};
+
+const normalizeFilterCondition = (raw = {}) => {
+    const sourceSurveyId = normalizeSurveyId(raw.sourceSurveyId || raw.surveyId || DEFAULT_SURVEY_ID);
+    const sourceQuestionId = String(raw.sourceQuestionId || raw.questionId || '').trim();
+
+    if (!sourceQuestionId) return null;
+
+    return {
+        sourceSurveyId,
+        sourceQuestionId,
+        selectedOption: normalizeSelectedOption(raw.selectedOption),
+        selectedOptionIndex: parseSelectedOptionIndex(raw.selectedOptionIndex),
+    };
+};
+
+const normalizeFilterConditions = (filters = {}) => {
+    const rawConditions = Array.isArray(filters.filters) && filters.filters.length > 0
+        ? filters.filters
+        : [filters];
+
+    const conditions = rawConditions
+        .map((condition) => normalizeFilterCondition(condition))
+        .filter(Boolean);
+
+    return conditions;
+};
+
+const findMatchedPhonesForCondition = async (answersCollection, condition, ownerUserId, candidatePhoneSet = null, limit = 500) => {
+    const queryLimit = Math.max(200, Math.min(limit * 40, 20000));
+
+    const answerDocs = await answersCollection
+        .find({
+            questionId: condition.sourceQuestionId,
+            ...(ownerUserId ? { ownerUserId } : {}),
+            ...buildSurveyMatch(condition.sourceSurveyId),
+            ...(candidatePhoneSet && candidatePhoneSet.size > 0 ? { phoneNumber: { $in: Array.from(candidatePhoneSet) } } : {}),
+        })
+        .sort({ createdAt: -1 })
+        .limit(queryLimit)
+        .toArray();
+
+    const latestByPhone = new Map();
+    for (const answerDoc of answerDocs) {
+        const phoneNumber = String(answerDoc?.phoneNumber || '').trim();
+        if (!phoneNumber || latestByPhone.has(phoneNumber)) continue;
+        latestByPhone.set(phoneNumber, answerDoc);
+    }
+
+    const matchedByPhone = new Map();
+    for (const [phoneNumber, answerDoc] of latestByPhone.entries()) {
+        const normalizedAnswerOption = normalizeSelectedOption(answerDoc?.selectedOption || answerDoc?.answerText || '');
+        const optionMatches = condition.selectedOption ? normalizedAnswerOption === condition.selectedOption : true;
+        const indexMatches = Number.isInteger(condition.selectedOptionIndex)
+            ? Number(answerDoc?.selectedOptionIndex) === Number(condition.selectedOptionIndex)
+            : true;
+
+        if (!optionMatches || !indexMatches) continue;
+        matchedByPhone.set(phoneNumber, answerDoc);
+    }
+
+    return matchedByPhone;
+};
 
 export async function listFarmers(db, ownerUserId = null) {
     const farmersColl = getCollection('farmers');
@@ -232,5 +425,182 @@ export async function deleteFarmerByPhone(db, phone, ownerUserId = null) {
         deletedAnswerCount: answersResult.deletedCount,
         deletedAudioCount: audioResult.deletedCount,
         deletedRegionCount: regionsResult.deletedCount,
+    };
+}
+
+export async function importFarmersFromCsv(db, csvText, ownerUserId = null) {
+    const farmers = getCollection('farmers');
+    const entries = parseFarmersFromCsv(csvText);
+
+    if (entries.length === 0) {
+        return {
+            importedCount: 0,
+            createdCount: 0,
+            updatedCount: 0,
+            skippedCount: 0,
+            farmers: [],
+        };
+    }
+
+    const uniqueByPhone = new Map();
+    for (const entry of entries) {
+        uniqueByPhone.set(entry.phoneNumber, entry);
+    }
+
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const entry of uniqueByPhone.values()) {
+        const existing = await farmers.findOne({ phoneNumber: entry.phoneNumber, ...(ownerUserId ? { ownerUserId } : {}) });
+        await farmers.updateOne(
+            { phoneNumber: entry.phoneNumber, ...(ownerUserId ? { ownerUserId } : {}) },
+            {
+                $set: {
+                    phoneNumber: entry.phoneNumber,
+                    ...(entry.preferredLanguage ? { preferredLanguage: entry.preferredLanguage } : {}),
+                    ...(entry.region ? { region: entry.region } : {}),
+                    status: existing?.status || 'in_progress',
+                    ...(ownerUserId ? { ownerUserId } : {}),
+                    updatedAt: new Date(),
+                },
+                $setOnInsert: {
+                    createdAt: new Date(),
+                },
+            },
+            { upsert: true }
+        );
+
+        if (existing) {
+            updatedCount += 1;
+        } else {
+            createdCount += 1;
+        }
+    }
+
+    return {
+        importedCount: uniqueByPhone.size,
+        createdCount,
+        updatedCount,
+        skippedCount: Math.max(entries.length - uniqueByPhone.size, 0),
+        farmers: Array.from(uniqueByPhone.values()).map((item) => item.phoneNumber),
+    };
+}
+
+export async function filterFarmersByAnswer(db, filters = {}, ownerUserId = null) {
+    const answers = getCollection('answers');
+    const farmers = getCollection('farmers');
+
+    const mode = String(filters.mode || 'all').trim().toLowerCase() === 'any' ? 'any' : 'all';
+    const conditions = normalizeFilterConditions(filters);
+    const limit = Math.max(1, Math.min(Number(filters.limit) || 500, 5000));
+
+    if (conditions.length === 0) {
+        throw new Error('At least one valid filter condition is required');
+    }
+
+    const matchedByCondition = [];
+    let candidatePhonesForAllMode = null;
+
+    for (const condition of conditions) {
+        const matchedForCondition = await findMatchedPhonesForCondition(
+            answers,
+            condition,
+            ownerUserId,
+            mode === 'all' ? candidatePhonesForAllMode : null,
+            limit
+        );
+
+        matchedByCondition.push({ condition, matchedForCondition });
+
+        if (mode === 'all') {
+            candidatePhonesForAllMode = new Set(matchedForCondition.keys());
+            if (candidatePhonesForAllMode.size === 0) break;
+        }
+    }
+
+    let combinedPhones = [];
+    if (mode === 'all') {
+        const [first, ...rest] = matchedByCondition;
+        const seed = new Set(first ? Array.from(first.matchedForCondition.keys()) : []);
+
+        for (const item of rest) {
+            const nextSet = new Set(item.matchedForCondition.keys());
+            for (const phoneNumber of Array.from(seed)) {
+                if (!nextSet.has(phoneNumber)) {
+                    seed.delete(phoneNumber);
+                }
+            }
+        }
+
+        combinedPhones = Array.from(seed);
+    } else {
+        const union = new Set();
+        for (const item of matchedByCondition) {
+            for (const phoneNumber of item.matchedForCondition.keys()) {
+                union.add(phoneNumber);
+            }
+        }
+        combinedPhones = Array.from(union);
+    }
+
+    if (combinedPhones.length > limit) {
+        combinedPhones = combinedPhones.slice(0, limit);
+    }
+
+    if (combinedPhones.length === 0) {
+        return {
+            mode,
+            conditions,
+            totalMatched: 0,
+            farmers: [],
+            phoneNumbers: [],
+        };
+    }
+
+    const farmerDocs = await farmers.find({ phoneNumber: { $in: combinedPhones }, ...(ownerUserId ? { ownerUserId } : {}) }).toArray();
+    const farmerByPhone = new Map(farmerDocs.map((item) => [String(item.phoneNumber || '').trim(), item]));
+
+    const farmerResults = combinedPhones.map((phoneNumber) => {
+        const farmer = farmerByPhone.get(phoneNumber) || null;
+        const matchedConditions = matchedByCondition
+            .map((item, index) => {
+                const answerDoc = item.matchedForCondition.get(phoneNumber);
+                if (!answerDoc) return null;
+
+                return {
+                    index,
+                    questionId: item.condition.sourceQuestionId,
+                    surveyId: item.condition.sourceSurveyId,
+                    selectedOption: answerDoc.selectedOption || null,
+                    selectedOptionIndex: Number.isInteger(Number(answerDoc.selectedOptionIndex))
+                        ? Number(answerDoc.selectedOptionIndex)
+                        : null,
+                    answerText: answerDoc.answerText || null,
+                    answeredAt: answerDoc.createdAt || null,
+                };
+            })
+            .filter(Boolean);
+
+        return {
+            phoneNumber,
+            preferredLanguage: farmer?.preferredLanguage || null,
+            region: farmer?.region || null,
+            status: farmer?.status || null,
+            matchedConditions,
+            matchedAnswer: matchedConditions[0] || null,
+        };
+    });
+
+    const firstCondition = conditions[0] || null;
+    return {
+        mode,
+        conditions,
+        sourceSurveyId: firstCondition?.sourceSurveyId || null,
+        sourceQuestionId: firstCondition?.sourceQuestionId || null,
+        selectedOption: firstCondition?.selectedOption || null,
+        selectedOptionIndex: firstCondition?.selectedOptionIndex ?? null,
+        totalMatched: farmerResults.length,
+        farmers: farmerResults,
+        phoneNumbers: farmerResults.map((item) => item.phoneNumber),
     };
 }

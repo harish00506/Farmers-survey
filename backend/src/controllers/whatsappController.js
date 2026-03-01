@@ -10,9 +10,11 @@ import {
   saveVoiceAnswer,
   updateAnswerSelection,
 } from '../services/surveyEngine.js';
-import { storeAudioFile } from '../services/audioService.js';
+import { storeAudioFile, storeUploadedFile, transcribeAudio } from '../services/audioService.js';
 import { synthesizeText, checkTtsEndpoint } from '../services/ttsService.js';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 
 const getCollection = (_db, name) => getModelByCollection(name).collection;
 const DEFAULT_SURVEY_ID = 'survey1';
@@ -73,6 +75,118 @@ const LANGUAGE_PROMPTS = {
   default: 'We will continue in English. Reply 1 to continue.',
 };
 
+// ── Localized common messages used throughout the survey flow ──
+const SURVEY_MESSAGES = {
+  surveyComplete: {
+    telugu: '✅ సర్వే పూర్తయింది! మీ సమాధానాలకు ధన్యవాదాలు. మేము విశ్లేషించి త్వరలో అంతర్దృష్టులను పంచుకుంటాము.',
+    hindi: '✅ सर्वे पूरा हो गया! आपके उत्तरों के लिए धन्यवाद। हम विश्लेषण करके जल्द ही जानकारी साझा करेंगे।',
+    kannada: '✅ ಸಮೀಕ್ಷೆ ಪೂರ್ಣಗೊಂಡಿದೆ! ನಿಮ್ಮ ಉತ್ತರಗಳಿಗೆ ಧನ್ಯವಾದಗಳು. ನಾವು ವಿಶ್ಲೇಷಿಸಿ ಶೀಘ್ರದಲ್ಲಿ ಒಳನೋಟಗಳನ್ನು ಹಂಚಿಕೊಳ್ಳುತ್ತೇವೆ.',
+    english: '✅ Survey completed! Thank you for your responses. We will analyze and share insights soon.',
+  },
+  surveyCompleteTts: {
+    telugu: 'ధన్యవాదాలు! సర్వే ఇప్పుడు పూర్తయింది. మేము మీ సమాధానాలను విశ్లేషించి త్వరలో అంతర్దృష్టులను పంచుకుంటాము.',
+    hindi: 'धन्यवाद! सर्वे अब पूरा हो गया है। हम आपके उत्तरों का विश्लेषण करके जल्द ही जानकारी साझा करेंगे।',
+    kannada: 'ಧನ್ಯವಾದಗಳು! ಸಮೀಕ್ಷೆ ಈಗ ಪೂರ್ಣಗೊಂಡಿದೆ. ನಾವು ನಿಮ್ಮ ಉತ್ತರಗಳನ್ನು ವಿಶ್ಲೇಷಿಸಿ ಶೀಘ್ರದಲ್ಲಿ ಒಳನೋಟಗಳನ್ನು ಹಂಚಿಕೊಳ್ಳುತ್ತೇವೆ.',
+    english: 'Thank you! The survey is now complete. We will analyze your responses and share insights soon.',
+  },
+  errorProcessing: {
+    telugu: '❌ మీ సమాధానాన్ని ప్రాసెస్ చేస్తూ లోపం వచ్చింది. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ आपका उत्तर प्रोसेस करते समय त्रुटि हुई। कृपया फिर प्रयास करें।',
+    kannada: '❌ ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸುವಾಗ ದೋಷ ಉಂಟಾಯಿತು. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Error processing response. Please try again.',
+  },
+  invalidOption: {
+    telugu: '❌ చెల్లని ఎంపిక. దయచేసి 1-{n} నుండి ఎంచుకోండి.',
+    hindi: '❌ अमान्य विकल्प। कृपया 1-{n} में से चुनें।',
+    kannada: '❌ ಅಮಾನ್ಯ ಆಯ್ಕೆ. ದಯವಿಟ್ಟು 1-{n} ರಿಂದ ಆಯ್ಕೆ ಮಾಡಿ.',
+    english: '❌ Invalid option. Please choose 1-{n}',
+  },
+  voiceReceived: {
+    telugu: '✅ వాయిస్ నోట్ అందింది. దయచేసి మీ సమాధానాన్ని నిర్ధారించడానికి ఎంపిక సంఖ్యతో రిప్లై చేయండి.',
+    hindi: '✅ वॉइस नोट प्राप्त। कृपया विकल्प संख्या भेजकर अपना उत्तर पुष्टि करें।',
+    kannada: '✅ ವಾಯ್ಸ್ ನೋಟ್ ಸ್ವೀಕರಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಆಯ್ಕೆ ಸಂಖ್ಯೆಯೊಂದಿಗೆ ಉತ್ತರಿಸಿ ದೃಢೀಕರಿಸಿ.',
+    english: '✅ Voice note received. Please reply with the option number to confirm your answer.',
+  },
+  errorVoice: {
+    telugu: '❌ వాయిస్ నోట్ ప్రాసెస్ చేయడంలో లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ वॉइस नोट प्रोसेस करने में त्रुटि। कृपया फिर प्रयास करें।',
+    kannada: '❌ ವಾಯ್ಸ್ ನೋಟ್ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸುವಲ್ಲಿ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Error processing voice note. Please try again.',
+  },
+  answerConfirm: {
+    telugu: '✅ మీ సమాధానం: {answer}',
+    hindi: '✅ आपका उत्तर: {answer}',
+    kannada: '✅ ನಿಮ್ಮ ಉತ್ತರ: {answer}',
+    english: '✅ Your answer: {answer}',
+  },
+  audioNoMediaId: {
+    telugu: '⚠️ ఆడియో మీడియా ID లేకుండా వచ్చింది. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '⚠️ ऑडियो बिना मीडिया ID के प्राप्त हुआ। कृपया फिर प्रयास करें।',
+    kannada: '⚠️ ಆಡಿಯೋ ಮಾಧ್ಯಮ ID ಇಲ್ಲದೆ ಬಂದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '⚠️ Audio received without media ID. Please try again.',
+  },
+  noActiveSession: {
+    telugu: '⚠️ యాక్టివ్ సెషన్ లేదు. సర్వే ప్రారంభించడానికి "START" ను రిప్లై చేయండి.',
+    hindi: '⚠️ कोई सक्रिय सत्र नहीं। सर्वे शुरू करने के लिए "START" उत्तर दें।',
+    kannada: '⚠️ ಸಕ್ರಿಯ ಸೆಷನ್ ಇಲ್ಲ. ಸರ್ವೇ ಪ್ರಾರಂಭಿಸಲು "START" ಗೆ ಉತ್ತರಿಸಿ.',
+    english: '⚠️ No active session. Reply "START" to begin survey.',
+  },
+  noActiveQuestion: {
+    telugu: '⚠️ ఏక్రియ ప్రశ్న కనపడలేదు. సర్వే ప్రారంభించడానికి "START" ను రిప్లై చేయండి.',
+    hindi: '⚠️ कोई सक्रिय प्रश्न नहीं मिला। सर्वे शुरू करने के लिए "START" उत्तर दें।',
+    kannada: '⚠️ ಯಾವುದೇ ಸಕ್ರಿಯ ಪ್ರಶ್ನೆ ಕಂಡುಬಂದಿಲ್ಲ. ಸರ್ವೇ ಪ್ರಾರಂಭಿಸಲು "START" ಗೆ ಉತ್ತರಿಸಿ.',
+    english: '⚠️ No active question found. Reply "START" to begin survey.',
+  },
+  errorStarting: {
+    telugu: '❌ సర్వే ప్రారంభించడంలో లోపం. దయచేసి "START" తో మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ सर्वे शुरू करने में त्रुटि। कृपया "START" से फिर प्रयास करें।',
+    kannada: '❌ ಸರ್ವೇ ಪ್ರಾರಂಭಿಸುವಲ್ಲಿ ದೋಷ. ದಯವಿಟ್ಟು "START" ನೊಂದಿಗೆ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Error starting survey. Please try "START" again.',
+  },
+  errorSendingQuestion: {
+    telugu: '❌ ప్రస్తుత ప్రశ్నను పంపడంలో లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ वर्तमान प्रश्न भेजने में त्रुटि। कृपया फिर प्रयास करें।',
+    kannada: '❌ ಪ್ರಸ್ತುತ ಪ್ರಶ್ನೆ ಕಳುಹಿಸುವಲ್ಲಿ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Error sending the current question. Please try again.',
+  },
+  errorOnboarding: {
+    telugu: '❌ ఆన్‌బోర్డింగ్ సమయంలో లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ ऑनबोर्डिंग के दौरान त्रुटि। कृपया फिर प्रयास करें।',
+    kannada: '❌ ಆನ್‌ಬೋರ್ಡಿಂಗ್ ಸಮಯದಲ್ಲಿ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Error during onboarding. Please try again.',
+  },
+  errorSelection: {
+    telugu: '❌ ఎంపిక ప్రాసెస్ చేయడంలో లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ चयन प्रोसेस करने में त्रुटि। कृपया फिर प्रयास करें।',
+    kannada: '❌ ಆಯ್ಕೆ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸುವಲ್ಲಿ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Error processing selection. Please try again.',
+  },
+  errorPreference: {
+    telugu: '❌ ప్రాధాన్యత సెట్ చేయడంలో విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+    hindi: '❌ प्राथमिकता सेट करने में विफल। कृपया फिर प्रयास करें।',
+    kannada: '❌ ಆದ್ಯತೆ ಹೊಂದಿಸಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    english: '❌ Failed to set preference. Please try again.',
+  },
+};
+
+const getLocalizedSurveyMessage = (key, lang = 'english', replacements = {}) => {
+  const langNorm = String(lang || 'english').toLowerCase();
+  const msgs = SURVEY_MESSAGES[key];
+  if (!msgs) return '';
+  let msg = msgs[langNorm] || msgs.english || '';
+  for (const [k, v] of Object.entries(replacements)) {
+    msg = msg.replace(`{${k}}`, v);
+  }
+  return msg;
+};
+
+const SECTION_TITLE = {
+  telugu: 'ఎంపికలు',
+  hindi: 'विकल्प',
+  kannada: 'ಆಯ್ಕೆಗಳು',
+  english: 'Options',
+};
+
 // Localized messages for mode selection
 const MODE_PROMPTS = {
   telugu: 'మీరు ఆడియో (వాయిస్ నోట్స్) లేదా టెక్స్ట్ (టైప్ చేయబడిన) ద్వారా కొనసాగించాలనుకుంటున్నారా? ఆడియో కోసం "Audio", టెక్స్ట్ కోసం "Text" ను ఎంచుకోండి.',
@@ -100,11 +214,672 @@ const WHATSAPP_API_BASE_URL = process.env.WHATSAPP_API_BASE_URL || 'https://grap
 const BULK_ASYNC_THRESHOLD = Number(process.env.BULK_INVITE_ASYNC_THRESHOLD || 50);
 const BULK_MAX_SIZE = Number(process.env.BULK_INVITE_MAX_SIZE || 1000);
 const BULK_BATCH_SIZE = Number(process.env.BULK_INVITE_BATCH_SIZE || 20);
-const INVITE_TEMPLATE_NAME = process.env.WHATSAPP_INVITE_TEMPLATE_NAME || '';
-const INVITE_TEMPLATE_LANG = process.env.WHATSAPP_INVITE_TEMPLATE_LANG || 'en_US';
+let warnedLegacyTemplateEnvKey = false;
+
+const TWILIO_API_BASE_URL = process.env.TWILIO_API_BASE_URL || 'https://api.twilio.com';
+
+const getTwilioConfig = () => ({
+  accountSid: String(process.env.TWILIO_ACCOUNT_SID || '').trim(),
+  authToken: String(process.env.TWILIO_AUTH_TOKEN || '').trim(),
+  fromNumber: String(process.env.TWILIO_PHONE_NUMBER || '').trim(),
+  voiceWebhookBaseUrl: String(
+    process.env.TWILIO_VOICE_WEBHOOK_BASE_URL
+    || process.env.WHATSAPP_WEBHOOK_URL
+    || process.env.SERVER_PUBLIC_BASE_URL
+    || ''
+  ).trim(),
+});
+
+const normalizeBaseUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+};
+
+const buildTwilioVoiceWebhookUrl = (step, phoneNumber, surveyId = DEFAULT_SURVEY_ID) => {
+  const config = getTwilioConfig();
+  const base = normalizeBaseUrl(config.voiceWebhookBaseUrl);
+  if (!base) return '';
+
+  const url = new URL(`${base}/voice/twilio/${step}`);
+  url.searchParams.set('phone', String(phoneNumber || ''));
+  url.searchParams.set('surveyId', normalizeSurveyId(surveyId));
+  return url.toString();
+};
+
+const xmlEscape = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&apos;');
+
+const getTwilioLanguage = (preferredLanguage = 'english') => {
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  const map = {
+    english: 'en-IN',
+    hindi: 'hi-IN',
+    telugu: 'te-IN',
+    kannada: 'kn-IN',
+  };
+  return map[lang] || 'en-IN';
+};
+
+// Twilio's built-in <Gather speech> STT works reliably only for some languages.
+// For unreliable languages, we use DTMF-only Gather and fall through to <Record>
+// where server-side Sarvam/Groq STT handles speech transcription accurately.
+const TWILIO_SPEECH_RELIABLE = {
+  hindi: false,
+  english: false,
+  telugu: false,
+  kannada: false,
+};
+
+const isTwilioSpeechReliable = (preferredLanguage = 'english') => {
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  return TWILIO_SPEECH_RELIABLE[lang] ?? false;
+};
+
+const getTwilioCallMessages = (preferredLanguage = 'english') => {
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  const map = {
+    english: {
+      retry: 'Sorry, I did not understand. Could you please repeat your answer once more.',
+      complete: 'Thank you. You have completed the survey. Goodbye.',
+      noQuestion: 'No active quiz question found for this call right now. Please try again in a moment. Goodbye.',
+      invalidPhone: 'Invalid phone number for this quiz call. Goodbye.',
+      recordPrompt: 'Please say your answer now.',
+      recordTimeout: 'No voice response detected. Let us try the question again.',
+      processError: 'An error occurred while processing your answer. Goodbye.',
+      confirm: (optionText) => `You selected: ${optionText}.`,
+    },
+    hindi: {
+      retry: 'क्षमा करें, मैं समझ नहीं पाया। कृपया अपना उत्तर एक बार फिर बताइए।',
+      complete: 'धन्यवाद। आपने सर्वे पूरा कर लिया है। अलविदा।',
+      noQuestion: 'इस कॉल के लिए अभी कोई सक्रिय प्रश्न नहीं मिला। कृपया थोड़ी देर बाद फिर प्रयास करें।',
+      invalidPhone: 'इस कॉल के लिए फोन नंबर अमान्य है। अलविदा।',
+      recordPrompt: 'कृपया अब अपना उत्तर बोलें।',
+      recordTimeout: 'कोई आवाज़ नहीं मिली। हम प्रश्न फिर से पूछते हैं।',
+      processError: 'आपके उत्तर को संसाधित करते समय त्रुटि हुई। अलविदा।',
+      confirm: (optionText) => `आपने चुना: ${optionText}।`,
+    },
+    kannada: {
+      retry: 'ಕ್ಷಮಿಸಿ, ನನಗೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಮತ್ತೊಮ್ಮೆ ಹೇಳಬಹುದೇ.',
+      complete: 'ಧನ್ಯವಾದಗಳು. ನೀವು ಸಮೀಕ್ಷೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಿದ್ದೀರಿ. ವಿದಾಯ.',
+      noQuestion: 'ಈ ಕರೆಗಾಗಿ ಈಗ ಸಕ್ರಿಯ ಪ್ರಶ್ನೆ ದೊರಕಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+      invalidPhone: 'ಈ ಕರೆಗಾಗಿ ಫೋನ್ ಸಂಖ್ಯೆ ಅಮಾನ್ಯವಾಗಿದೆ. ವಿದಾಯ.',
+      recordPrompt: 'ದಯವಿಟ್ಟು ಈಗ ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಹೇಳಿ.',
+      recordTimeout: 'ಧ್ವನಿ ಪ್ರತಿಕ್ರಿಯೆ ಸಿಗಲಿಲ್ಲ. ಪ್ರಶ್ನೆಯನ್ನು ಮತ್ತೆ ಕೇಳೋಣ.',
+      processError: 'ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸುವಾಗ ದೋಷ ಉಂಟಾಯಿತು. ವಿದಾಯ.',
+      confirm: (optionText) => `ನೀವು ಆಯ್ಕೆ ಮಾಡಿದುದು: ${optionText}.`,
+    },
+    telugu: {
+      retry: 'క్షమించండి, నేను అర్థం చేసుకోలేకపోయాను. దయచేసి మీ సమాధానాన్ని మరోసారి చెప్పగలరా.',
+      complete: 'ధన్యవాదాలు. మీరు సర్వే పూర్తి చేశారు. వీడ్కోలు.',
+      noQuestion: 'ఈ కాల్ కోసం ప్రస్తుతం యాక్టివ్ ప్రశ్న లేదు. దయచేసి కొద్దిసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.',
+      invalidPhone: 'ఈ కాల్ కోసం ఫోన్ నంబర్ చెల్లదు. వీడ్కోలు.',
+      recordPrompt: 'దయచేసి ఇప్పుడు మీ సమాధానం చెప్పండి.',
+      recordTimeout: 'వాయిస్ స్పందన రాలేదు. ప్రశ్నను మళ్లీ అడుగుదాం.',
+      processError: 'మీ సమాధానాన్ని ప్రాసెస్ చేస్తూ లోపం వచ్చింది. వీడ్కోలు.',
+      confirm: (optionText) => `మీరు ఎంపిక చేసినది: ${optionText}.`,
+    },
+  };
+
+  return map[lang] || map.english;
+};
+
+const buildTwilioAudioFileUrl = (audioId) => {
+  const config = getTwilioConfig();
+  const base = normalizeBaseUrl(config.voiceWebhookBaseUrl);
+  if (!base || !audioId) return '';
+  return `${base}/voice/twilio/audio/${encodeURIComponent(String(audioId))}`;
+};
+
+const isTwilioPlayableMime = (mimeType = '') => {
+  const mime = String(mimeType || '').toLowerCase();
+  return mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/mpeg' || mime === 'audio/mp3';
+};
+
+const createTwilioPromptAudioUrl = async (db, promptText, preferredLanguage = 'english') => {
+  const twilioFormat = String(process.env.TWILIO_PROMPT_AUDIO_FORMAT || process.env.TWILIO_QUESTION_AUDIO_FORMAT || 'wav').toLowerCase();
+  const result = await synthesizeText(promptText, { lang: preferredLanguage, format: twilioFormat });
+  const audioCollection = getModelByCollection('audio').collection;
+
+  await audioCollection.insertOne({
+    id: result.audioId,
+    fileName: result.fileName,
+    filePath: result.filePath,
+    mimeType: result.mimeType,
+    fileSize: result.fileSize,
+    source: 'twilio_tts',
+    sourceText: promptText,
+    lang: preferredLanguage,
+    createdAt: new Date(),
+    transcriptionStatus: 'not_requested',
+  });
+
+  return buildTwilioAudioFileUrl(result.audioId);
+};
+
+const resolvePreRecordedQuestionAudioUrl = async (db, question, preferredLanguage = 'english') => {
+  try {
+    if (!question?.id) return '';
+
+    const lang = String(preferredLanguage || 'english').toLowerCase();
+    const audioCollection = getCollection(db, 'audio');
+    const existing = await audioCollection.findOne(
+      { source: 'twilio_tts_question', questionId: question.id, lang },
+      { sort: { createdAt: -1 } }
+    );
+
+    if (existing?.id && existing?.filePath && fs.existsSync(existing.filePath) && isTwilioPlayableMime(existing?.mimeType)) {
+      return buildTwilioAudioFileUrl(existing.id);
+    }
+
+    const { prompt } = getQuestionPromptForCall(question, lang);
+    const format = process.env.TWILIO_QUESTION_AUDIO_FORMAT || process.env.TWILIO_PROMPT_AUDIO_FORMAT || 'wav';
+    const timeoutMs = getTwilioPromptTtsTimeoutMs();
+    const result = await withTimeout(
+      synthesizeText(prompt, { lang, format }),
+      timeoutMs,
+      `Twilio question pre-record timed out after ${timeoutMs}ms`
+    );
+
+    await audioCollection.insertOne({
+      id: result.audioId,
+      fileName: result.fileName,
+      filePath: result.filePath,
+      mimeType: result.mimeType,
+      fileSize: result.fileSize,
+      source: 'twilio_tts_question',
+      sourceText: prompt,
+      lang,
+      questionId: question.id,
+      createdAt: new Date(),
+      transcriptionStatus: 'not_requested',
+    });
+
+    return buildTwilioAudioFileUrl(result.audioId);
+  } catch (error) {
+    console.warn('⚠️ Twilio question pre-record unavailable; falling back to live or <Say>:', error?.message || error);
+    return '';
+  }
+};
+
+const buildTwilioQuestionPrompt = (question, preferredLanguage = 'english') => {
+  const { prompt } = getQuestionPromptForCall(question, preferredLanguage);
+  return prompt;
+};
+
+const ensureTwilioQuestionAudioCached = async (db, question, preferredLanguage = 'english', ownerUserId = null, surveyId = DEFAULT_SURVEY_ID) => {
+  if (!question?.id) return null;
+
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  const audioCollection = getCollection(db, 'audio');
+
+  const existing = await audioCollection.findOne(
+    { source: 'twilio_tts_question', questionId: question.id, lang, ...(ownerUserId ? { ownerUserId } : {}), ...buildSurveyMatch(surveyId) },
+    { sort: { createdAt: -1 } }
+  );
+
+  if (existing?.id && existing?.filePath && fs.existsSync(existing.filePath) && isTwilioPlayableMime(existing?.mimeType)) {
+    return existing.id;
+  }
+
+  const format = process.env.TWILIO_QUESTION_AUDIO_FORMAT || process.env.TWILIO_PROMPT_AUDIO_FORMAT || 'wav';
+  const timeoutMs = Number(process.env.TWILIO_PREWARM_TTS_TIMEOUT_MS || 30000);
+  const prompt = buildTwilioQuestionPrompt(question, lang);
+
+  const result = await withTimeout(
+    synthesizeText(prompt, { lang, format }),
+    timeoutMs,
+    `Twilio question prewarm timed out after ${timeoutMs}ms`
+  );
+
+  await audioCollection.insertOne({
+    id: result.audioId,
+    fileName: result.fileName,
+    filePath: result.filePath,
+    mimeType: result.mimeType,
+    fileSize: result.fileSize,
+    source: 'twilio_tts_question',
+    sourceText: prompt,
+    lang,
+    questionId: question.id,
+    ...(ownerUserId ? { ownerUserId } : {}),
+    surveyId: normalizeSurveyId(surveyId),
+    createdAt: new Date(),
+    transcriptionStatus: 'not_requested',
+  });
+
+  return result.audioId;
+};
+
+const prewarmTwilioQuestionAudioCache = async (db, surveyId = DEFAULT_SURVEY_ID, ownerUserId = null, preferredLanguage = 'english') => {
+  try {
+    const normalizedSurveyId = normalizeSurveyId(surveyId);
+    const lang = String(preferredLanguage || 'english').toLowerCase();
+    const maxQuestions = Math.max(1, Math.min(Number(process.env.TWILIO_PREWARM_MAX_QUESTIONS || 25), 100));
+    const questions = getCollection(db, 'questions');
+
+    let docs = await questions
+      .find({ ...(ownerUserId ? { ownerUserId } : {}), ...buildSurveyMatch(normalizedSurveyId) })
+      .sort({ sequence: 1 })
+      .limit(maxQuestions)
+      .toArray();
+
+    if ((!docs || docs.length === 0) && ownerUserId) {
+      docs = await questions
+        .find({ ...buildSurveyMatch(normalizedSurveyId) })
+        .sort({ sequence: 1 })
+        .limit(maxQuestions)
+        .toArray();
+    }
+
+    if (!docs || docs.length === 0) {
+      console.warn(`⚠️ Twilio prewarm skipped: no questions found for survey=${normalizedSurveyId}`);
+      return;
+    }
+
+    for (const question of docs) {
+      try {
+        await ensureTwilioQuestionAudioCached(db, question, lang, ownerUserId, normalizedSurveyId);
+      } catch (err) {
+        console.warn(`⚠️ Twilio prewarm failed for question=${question?.id}:`, err?.message || err);
+      }
+    }
+
+    console.log(`✅ Twilio question audio prewarm completed for survey=${normalizedSurveyId} lang=${lang} count=${docs.length}`);
+  } catch (error) {
+    console.warn('⚠️ Twilio prewarm failed:', error?.message || error);
+  }
+};
+
+const getTwilioPromptTtsTimeoutMs = () => Number(process.env.TWILIO_PROMPT_TTS_TIMEOUT_MS || 7000);
+const getTwilioRecordSttTimeoutMs = () => Number(process.env.TWILIO_RECORD_STT_TIMEOUT_MS || 15000);
+
+const withTimeout = (promise, timeoutMs, timeoutMessage = 'operation timeout') => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  promise
+    .then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    })
+    .catch((error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+});
+
+const safeCreateTwilioPromptAudioUrl = async (db, promptText, preferredLanguage = 'english') => {
+  try {
+    const timeoutMs = getTwilioPromptTtsTimeoutMs();
+    return await withTimeout(
+      createTwilioPromptAudioUrl(db, promptText, preferredLanguage),
+      timeoutMs,
+      `Twilio prompt TTS timed out after ${timeoutMs}ms`
+    );
+  } catch (ttsErr) {
+    console.warn('⚠️ Twilio prompt TTS unavailable; using <Say> fallback:', ttsErr?.message || ttsErr);
+    return '';
+  }
+};
+
+const fetchTwilioRecordingBuffer = async (recordingUrl) => {
+  const config = getTwilioConfig();
+  const safeUrl = String(recordingUrl || '').trim();
+  if (!safeUrl) throw new Error('Missing Twilio RecordingUrl');
+  const url = safeUrl.endsWith('.wav') ? safeUrl : `${safeUrl}.wav`;
+
+  const response = await axios.get(url, {
+    responseType: 'arraybuffer',
+    auth: {
+      username: config.accountSid,
+      password: config.authToken,
+    },
+    timeout: 60000,
+  });
+
+  return Buffer.from(response.data || []);
+};
+
+const getLocalizedNumberWord = (lang = 'english', index = 0) => {
+  const words = {
+    telugu: ['ఒకటి', 'రెండు', 'మూడు', 'నాలుగు', 'ఐదు', 'ఆరు', 'ఏడు', 'ఎనిమిది', 'తొమ్మిది', 'పది'],
+    hindi: ['एक', 'दो', 'तीन', 'चार', 'पांच', 'छह', 'सात', 'आठ', 'नौ', 'दस'],
+    kannada: ['ಒಂದು', 'ಎರಡು', 'ಮೂರು', 'ನಾಲ್ಕು', 'ಐದು', 'ಆರು', 'ಏಳು', 'ಎಂಟು', 'ಒಂಬತ್ತು', 'ಹತ್ತು'],
+    english: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'],
+  };
+
+  const list = words[String(lang || 'english').toLowerCase()] || words.english;
+  return list[index] || String(index + 1);
+};
+
+// ── TTS Prompt sanitizer ──
+// Converts number ranges (1-2, 3-5) to spoken forms, removes brackets, cleans slashes
+const RANGE_WORDS = {
+  telugu: { to: 'నుండి', moreThan: 'కంటే ఎక్కువ', orMore: 'లేదా అంతకంటే ఎక్కువ', or: 'లేదా' },
+  hindi: { to: 'से', moreThan: 'से अधिक', orMore: 'या इससे अधिक', or: 'या' },
+  kannada: { to: 'ರಿಂದ', moreThan: 'ಕ್ಕಿಂತ ಹೆಚ್ಚು', orMore: 'ಅಥವಾ ಹೆಚ್ಚು', or: 'ಅಥವಾ' },
+  english: { to: 'to', moreThan: 'more than', orMore: 'or more', or: 'or' },
+};
+
+const digitToLocalWord = (num, lang) => {
+  const words = {
+    telugu: ['సున్నా', 'ఒకటి', 'రెండు', 'మూడు', 'నాలుగు', 'ఐదు', 'ఆరు', 'ఏడు', 'ఎనిమిది', 'తొమ్మిది', 'పది'],
+    hindi: ['शून्य', 'एक', 'दो', 'तीन', 'चार', 'पांच', 'छह', 'सात', 'आठ', 'नौ', 'दस'],
+    kannada: ['ಸೊನ್ನೆ', 'ಒಂದು', 'ಎರಡು', 'ಮೂರು', 'ನಾಲ್ಕು', 'ಐದು', 'ಆರು', 'ಏಳು', 'ಎಂಟು', 'ಒಂಬತ್ತು', 'ಹತ್ತು'],
+    english: ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'],
+  };
+  const list = words[lang] || words.english;
+  const n = Number(num);
+  return (n >= 0 && n < list.length) ? list[n] : String(num);
+};
+
+const sanitizeTtsText = (text, lang = 'english') => {
+  let s = String(text || '');
+  // Remove square brackets: [Brand X] → Brand X
+  s = s.replace(/\[([^\]]+)\]/g, '$1');
+  // Replace forward-slash separators with localized "or"
+  const orWord = (RANGE_WORDS[lang] || RANGE_WORDS.english).or;
+  s = s.replace(/\//g, ` ${orWord} `);
+  // Convert number ranges: "1-2" → "ఒకటి నుండి రెండు" etc.
+  const rw = RANGE_WORDS[lang] || RANGE_WORDS.english;
+  s = s.replace(/(\d+)\s*[-–—]\s*(\d+)/g, (_, a, b) => {
+    return `${digitToLocalWord(a, lang)} ${rw.to} ${digitToLocalWord(b, lang)}`;
+  });
+  // Clean up multiple spaces
+  s = s.replace(/\s{2,}/g, ' ').trim();
+  return s;
+};
+
+const buildBilingualQuestionText = (question, preferredLanguage = 'english') => {
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  const localText = String(question?.[`text_${lang}`] || '').trim();
+  const englishText = String(question?.text || question?.text_english || '').trim();
+
+  if (lang === 'english') return englishText || localText;
+  // Return native language text only; fall back to English if native text is missing
+  return localText || englishText;
+};
+
+const getLocalizedOptionWord = (lang = 'english') => {
+  const map = {
+    telugu: 'ఎంపిక',
+    hindi: 'विकल्प',
+    kannada: 'ಆಯ್ಕೆ',
+    english: 'Option',
+  };
+  return map[String(lang || 'english').toLowerCase()] || map.english;
+};
+
+const getLocalizedCallInstruction = (lang = 'english') => {
+  const map = {
+    telugu: 'దయచేసి ఎంపిక నంబర్ నొక్కండి, లేదా మీ సమాధానం చెప్పండి.',
+    hindi: 'कृपया विकल्प संख्या दबाएं, या अपना उत्तर बोलें.',
+    kannada: 'ದಯವಿಟ್ಟು ಆಯ್ಕೆ ಸಂಖ್ಯೆಯನ್ನು ಒತ್ತಿ, ಅಥವಾ ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಹೇಳಿ.',
+    english: 'Please press the option number, or say your answer.',
+  };
+  return map[String(lang || 'english').toLowerCase()] || map.english;
+};
+
+const buildBilingualOptionsForSpeech = (question, preferredLanguage = 'english') => {
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  const localizedOptions = Array.isArray(question?.[`options_${lang}`]) && question[`options_${lang}`].length > 0
+    ? question[`options_${lang}`]
+    : (Array.isArray(question?.options) ? question.options : []);
+
+  const optionWord = getLocalizedOptionWord(lang);
+  return localizedOptions.map((localOption, index) => {
+    // Sanitize option text for TTS pronunciation
+    const localOptionText = sanitizeTtsText(String(localOption || '').trim(), lang);
+    const num = index + 1;
+    const localNumWord = getLocalizedNumberWord(lang, index);
+
+    if (lang === 'english') {
+      return `${optionWord} ${num}, ${localOptionText}`;
+    }
+
+    // Speak entirely in the selected native language (no English words)
+    return `${optionWord} ${localNumWord}, ${localOptionText}`;
+  });
+};
+
+const getQuestionPromptForCall = (question, preferredLanguage = 'english') => {
+  const lang = (preferredLanguage || 'english').toLowerCase();
+  // Sanitize question text for TTS
+  const questionText = sanitizeTtsText(buildBilingualQuestionText(question, lang), lang);
+  const options = Array.isArray(question?.[`options_${lang}`]) && question[`options_${lang}`].length > 0
+    ? question[`options_${lang}`]
+    : (Array.isArray(question?.options) ? question.options : []);
+
+  const optionSpeech = buildBilingualOptionsForSpeech(question, lang).join('. ');
+  const instruction = getLocalizedCallInstruction(lang);
+  const prompt = `${questionText}. ${optionSpeech}. ${instruction}`;
+
+  // Build speech hints with both English and localized options for better Twilio recognition
+  const englishOptions = Array.isArray(question?.options) ? question.options : [];
+  const localizedOpts = Array.isArray(question?.[`options_${lang}`]) && question[`options_${lang}`].length > 0
+    ? question[`options_${lang}`]
+    : englishOptions;
+  const hintParts = [];
+  for (let i = 0; i < Math.max(englishOptions.length, localizedOpts.length); i++) {
+    hintParts.push(String(i + 1));
+    if (localizedOpts[i]) hintParts.push(String(localizedOpts[i]).trim());
+    if (englishOptions[i] && englishOptions[i] !== localizedOpts[i]) hintParts.push(String(englishOptions[i]).trim());
+    // Add localized number words as hints (e.g., "ek", "do" for Hindi)
+    const numWord = getLocalizedNumberWord(lang, i);
+    if (numWord) hintParts.push(numWord);
+  }
+  const speechHints = hintParts.join(', ');
+  return { prompt, options: localizedOpts, speechHints };
+};
+
+const renderGatherTwiml = ({
+  questionPrompt,
+  actionUrl,
+  recordUrl,
+  promptAudioUrl = '',
+  confirmationMessage = '',
+  fallbackNoInputMessage = 'We did not receive your answer. Let us try once more.',
+  language = 'en-IN',
+  speechHints = '',
+  optionCount = 0,
+  speechReliable = true,
+}) => {
+  const langAttr = ` language="${xmlEscape(language)}"`;
+  const intro = confirmationMessage ? `  <Say${langAttr}>${xmlEscape(confirmationMessage)}</Say>\n  <Pause length="1"/>\n` : '';
+  const promptNode = promptAudioUrl
+    ? `    <Play>${xmlEscape(promptAudioUrl)}</Play>`
+    : `    <Say${langAttr}>${xmlEscape(questionPrompt)}</Say>`;
+
+  // When Twilio speech STT is unreliable for this language, use DTMF-only Gather
+  // with a shorter timeout, then fall through to <Record> for server-side STT
+  const gatherInput = speechReliable ? 'dtmf speech' : 'dtmf';
+  const gatherTimeout = speechReliable ? 8 : 2;
+  const hintsAttr = (speechReliable && speechHints) ? ` hints="${xmlEscape(speechHints)}"` : '';
+  const speechTimeoutAttr = speechReliable ? ' speechTimeout="5"' : '';
+  // Dynamic numDigits: 1 for ≤9 options, 2 for 10+ — eliminates the 7-second DTMF timeout delay
+  const numDigitsAttr = optionCount > 0 ? ` numDigits="${optionCount <= 9 ? 1 : 2}"` : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n${intro}  <Gather input="${gatherInput}" timeout="${gatherTimeout}"${speechTimeoutAttr} language="${xmlEscape(language)}" action="${xmlEscape(actionUrl)}" method="POST"${hintsAttr}${numDigitsAttr}>\n${promptNode}\n  </Gather>\n  <Say${langAttr}>${xmlEscape(fallbackNoInputMessage)}</Say>\n  <Redirect method="POST">${xmlEscape(recordUrl)}</Redirect>\n</Response>`;
+};
+
+const renderRecordTwiml = ({ actionUrl, recordPrompt = 'Please say your answer now.', noRecordingMessage = 'Sorry, no recording was captured.', language = 'en-IN' }) => {
+  const langAttr = ` language="${xmlEscape(language)}"`;
+  // The farmer already heard the question in the <Gather> TwiML — only say the record prompt here
+  // timeout=5 (seconds of silence before auto-stop), maxLength=10 (max recording duration)
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say${langAttr}>${xmlEscape(recordPrompt)}</Say>\n  <Record action="${xmlEscape(actionUrl)}" method="POST" playBeep="true" timeout="5" maxLength="10" recordingStatusCallbackEvent="completed"/>\n  <Say${langAttr}>${xmlEscape(noRecordingMessage)}</Say>\n  <Redirect method="POST">${xmlEscape(actionUrl.replace('/record?', '/answer?'))}</Redirect>\n</Response>`;
+};
+
+const renderSayTwiml = (message, language = 'en-IN') => {
+  const langAttr = ` language="${xmlEscape(language)}"`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say${langAttr}>${xmlEscape(message)}</Say>\n</Response>`;
+};
+
+const renderCompletionTwiml = (message, language = 'en-IN') => {
+  const langAttr = ` language="${xmlEscape(language)}"`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say${langAttr}>${xmlEscape(message)}</Say>\n  <Hangup/>\n</Response>`;
+};
+
+const processTwilioSelectedAnswer = async ({
+  db,
+  phoneNumber,
+  surveyId,
+  activeSession,
+  currentQuestion,
+  selectedOptionIndex,
+  preferredLanguage,
+  confirmationMessage = '',
+}) => {
+  const messages = getTwilioCallMessages(preferredLanguage);
+  const { sessionId, ownerUserId } = activeSession;
+  await saveAnswer(db, phoneNumber, sessionId, currentQuestion.id, selectedOptionIndex, ownerUserId || null, surveyId);
+
+  if (currentQuestion.id === 'Q_LOCATION') {
+    try {
+      const selectedRegionText = currentQuestion.options[selectedOptionIndex] || '';
+      const normalizedRegion = selectedRegionText
+        .toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const regionLang = REGION_LANGUAGE_MAP[normalizedRegion] || null;
+
+      await getCollection(db, 'regions').updateOne(
+        { name: normalizedRegion },
+        { $setOnInsert: { name: normalizedRegion, language: regionLang || null, area: 'Unknown area' } },
+        { upsert: true }
+      );
+      await getCollection(db, 'farmers').updateOne(
+        { phoneNumber },
+        { $set: { region: normalizedRegion, regionConfirmed: true } },
+        { upsert: true }
+      );
+    } catch (regionErr) {
+      console.warn('⚠️ Failed to update region from call response:', regionErr?.message || regionErr);
+    }
+  }
+
+  const nextQuestion = await getNextQuestion(db, currentQuestion.id, selectedOptionIndex, ownerUserId || null, surveyId);
+  if (!nextQuestion) {
+    await completeSession(db, phoneNumber, sessionId);
+    return renderCompletionTwiml(messages.complete, getTwilioLanguage(preferredLanguage));
+  }
+
+  const gatherActionUrl = buildTwilioVoiceWebhookUrl('gather', phoneNumber, surveyId);
+  const recordActionUrl = buildTwilioVoiceWebhookUrl('record', phoneNumber, surveyId);
+  const { prompt, speechHints: speechHintsStr } = getQuestionPromptForCall(nextQuestion, preferredLanguage);
+
+  let promptAudioUrl = await resolvePreRecordedQuestionAudioUrl(db, nextQuestion, preferredLanguage);
+  if (!promptAudioUrl) {
+    promptAudioUrl = await safeCreateTwilioPromptAudioUrl(db, prompt, preferredLanguage);
+  }
+
+  return renderGatherTwiml({
+    questionPrompt: prompt,
+    actionUrl: gatherActionUrl,
+    recordUrl: recordActionUrl,
+    promptAudioUrl,
+    confirmationMessage,
+    fallbackNoInputMessage: messages.recordTimeout,
+    language: getTwilioLanguage(preferredLanguage),
+    speechHints: speechHintsStr,
+    optionCount: nextQuestion.options?.length || 0,
+    speechReliable: isTwilioSpeechReliable(preferredLanguage),
+  });
+};
+
+const initiateTwilioQuizCall = async (phoneNumber, surveyId = DEFAULT_SURVEY_ID) => {
+  const config = getTwilioConfig();
+  const to = normalizePhoneNumber(phoneNumber);
+  const answerUrl = buildTwilioVoiceWebhookUrl('answer', to, surveyId);
+
+  if (!to) {
+    throw new AppError('Invalid destination phone number for Twilio call', 400);
+  }
+
+  if (!config.accountSid || !config.authToken || !config.fromNumber || !answerUrl) {
+    throw new AppError('Twilio is not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, and TWILIO_VOICE_WEBHOOK_BASE_URL.', 400);
+  }
+
+  const endpoint = `${TWILIO_API_BASE_URL}/2010-04-01/Accounts/${config.accountSid}/Calls.json`;
+  const payload = new URLSearchParams({
+    To: to,
+    From: config.fromNumber,
+    Url: answerUrl,
+    Method: 'POST',
+  });
+
+  const response = await axios.post(endpoint, payload.toString(), {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    auth: {
+      username: config.accountSid,
+      password: config.authToken,
+    },
+    timeout: 15000,
+  });
+
+  return {
+    callSid: response.data?.sid || null,
+    status: response.data?.status || 'queued',
+  };
+};
+
+const getInviteTemplateName = () => {
+  const primary = String(process.env.WHATSAPP_INVITE_TEMPLATE_NAME || '').trim();
+  if (primary) return primary;
+
+  const legacyTypoKey = String(process.env.WHATSAPP_INVITE_TEEMPLATE_NAME || '').trim();
+  if (legacyTypoKey) {
+    if (!warnedLegacyTemplateEnvKey) {
+      console.warn('⚠️ Detected legacy env key WHATSAPP_INVITE_TEEMPLATE_NAME. Please rename to WHATSAPP_INVITE_TEMPLATE_NAME.');
+      warnedLegacyTemplateEnvKey = true;
+    }
+    return legacyTypoKey;
+  }
+
+  return '';
+};
+
+const getInviteTemplateLang = () => String(process.env.WHATSAPP_INVITE_TEMPLATE_LANG || 'en_US').trim() || 'en_US';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const createInviteJobId = () => `invite_job_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+const isReEngagementError = (error) => {
+  const code = Number(error?.response?.data?.error?.code || 0);
+  const message = String(error?.response?.data?.error?.message || error?.message || '').toLowerCase();
+  return isReEngagementErrorCode(code, message);
+};
+
+const recordTemplateRecovery = async (db, phoneNumber, templateResult) => {
+  const farmers = getCollection(db, 'farmers');
+  if (templateResult?.sent) {
+    await farmers.updateOne(
+      { phoneNumber },
+      {
+        $set: {
+          lastInviteRecovery: 'template_fallback_sent',
+          lastInviteRecoveryAt: new Date(),
+          lastInviteRecoveryTemplate: templateResult.templateName || null,
+          lastInviteRecoveryMessageId: templateResult.messageId || null,
+        },
+      },
+      { upsert: true }
+    );
+    return;
+  }
+
+  await farmers.updateOne(
+    { phoneNumber },
+    {
+      $set: {
+        lastInviteRecovery: `template_fallback_skipped:${templateResult?.reason || 'unknown'}`,
+        lastInviteRecoveryAt: new Date(),
+      },
+    },
+    { upsert: true }
+  );
+};
 
 const parsePhoneNumbersFromCsv = (rawCsv = '') => {
   const lines = String(rawCsv || '').split(/\r?\n/);
@@ -166,6 +941,24 @@ const inviteSinglePhone = async (db, ownerUserId, targetPhone, targetSurveyId = 
       if (result && result.fallback) usedFallback = true;
     } catch (err) {
       console.warn('❌ Failed to send language selection on invite:', err.message);
+      if (isReEngagementError(err)) {
+        const templateResult = await sendInviteTemplateMessage(targetPhone);
+        await recordTemplateRecovery(db, targetPhone, templateResult);
+
+        if (templateResult?.sent) {
+          return {
+            success: true,
+            phoneNumber: targetPhone,
+            message: 'Invite sent using approved template (recipient outside 24-hour window).',
+          };
+        }
+
+        throw new AppError(
+          'Invite failed: recipient is outside WhatsApp 24-hour window and no approved template fallback is configured. Set WHATSAPP_INVITE_TEMPLATE_NAME in backend/.env.',
+          400
+        );
+      }
+
       await farmers.updateOne({ phoneNumber: targetPhone }, { $set: { lastInviteError: err.message, inviteFailedAt: new Date() } }, { upsert: true });
       throw err;
     }
@@ -176,6 +969,24 @@ const inviteSinglePhone = async (db, ownerUserId, targetPhone, targetSurveyId = 
     } catch (err) {
       console.warn('❌ Failed to send continue/change on invite:', err.message);
       try {
+        if (isReEngagementError(err)) {
+          const templateResult = await sendInviteTemplateMessage(targetPhone);
+          await recordTemplateRecovery(db, targetPhone, templateResult);
+
+          if (templateResult?.sent) {
+            return {
+              success: true,
+              phoneNumber: targetPhone,
+              message: 'Invite sent using approved template (recipient outside 24-hour window).',
+            };
+          }
+
+          throw new AppError(
+            'Invite failed: recipient is outside WhatsApp 24-hour window and no approved template fallback is configured. Set WHATSAPP_INVITE_TEMPLATE_NAME in backend/.env.',
+            400
+          );
+        }
+
         if (isPermissionError(err)) {
           const lang = (farmer?.preferredLanguage || 'english').toLowerCase();
           const fallbackText = MODE_PROMPTS[lang] || MODE_PROMPTS.english;
@@ -572,7 +1383,7 @@ export const handleIncomingMessage = async (req, res, next) => {
         const explicitLang = parseRequestedLanguage(langToken);
         if (langToken && !explicitLang) {
           await sendMessage(phoneNumber, '⚠️ Unknown language option. Please say START, or START followed by TELUGU/HINDI/KANNADA/ENGLISH.');
-          return;
+          return res.status(200).json({ success: true });
         }
         await handleStartMessage(db, phoneNumber, message, explicitLang);
       } else if (/^\d+$/.test(text)) {
@@ -586,7 +1397,7 @@ export const handleIncomingMessage = async (req, res, next) => {
           const langFromText = parseRequestedLanguage(rawText);
           if (langFromText) {
             await handleLanguageSelection(db, phoneNumber, langFromText);
-            return;
+            return res.status(200).json({ success: true });
           }
 
           // Support numeric fallback for language selection (1=Telugu,2=Hindi,3=Kannada,4=English)
@@ -595,23 +1406,31 @@ export const handleIncomingMessage = async (req, res, next) => {
             const langToken = mapping[rawText];
             if (langToken) {
               await handleLanguageSelection(db, phoneNumber, langToken);
-              return;
+              return res.status(200).json({ success: true });
             }
           }
 
           await sendIntroductionMessage(phoneNumber);
-          return;
+          return res.status(200).json({ success: true });
         }
 
         // Accept typed mode selection keywords from returning farmers (e.g., "audio", "voice", "text")
         const lower = rawText.trim().toLowerCase();
         if (lower.includes('audio') || lower.includes('voice')) {
           await handleModeSelection(db, phoneNumber, 'audio');
-          return;
+          return res.status(200).json({ success: true });
         }
         if (lower.includes('text') || lower.includes('type')) {
           await handleModeSelection(db, phoneNumber, 'text');
-          return;
+          return res.status(200).json({ success: true });
+        }
+        if (lower.includes('call') || lower.includes('phone call')) {
+          await handleQuizChannelSelection(db, phoneNumber, 'call');
+          return res.status(200).json({ success: true });
+        }
+        if (lower.includes('whatsapp') || lower.includes('chat')) {
+          await handleQuizChannelSelection(db, phoneNumber, 'whatsapp');
+          return res.status(200).json({ success: true });
         }
 
         // Other text from an existing farmer
@@ -643,14 +1462,14 @@ export const handleIncomingMessage = async (req, res, next) => {
       // Action replies (continue / change language)
       if (replyId.startsWith('action_')) {
         await handleActionReply(db, phoneNumber, replyId);
-        return;
+        return res.status(200).json({ success: true });
       }
 
       // Language selection replies have ids like 'lang_telugu', 'lang_hindi'
       if (replyId.startsWith('lang_')) {
         const langToken = replyId.replace('lang_', '');
         await handleLanguageSelection(db, phoneNumber, langToken);
-        return;
+        return res.status(200).json({ success: true });
       }
 
       if (replyId.startsWith('opt_')) {
@@ -671,6 +1490,412 @@ export const handleIncomingMessage = async (req, res, next) => {
   } catch (error) {
     console.error('❌ Error handling incoming message:', error.message);
     next(error);
+  }
+};
+
+// Normalize option text for fuzzy matching: remove brackets, extra spaces, lowercase
+// Note: slashes are preserved initially so we can split compound options (Brand X/Y/Z) later
+const normalizeForMatching = (text) => {
+  return String(text || '')
+    .replace(/\[|\]/g, '')       // remove brackets
+    .replace(/[-–—]/g, ' ')       // dashes → space
+    .replace(/\s+/g, ' ')         // collapse whitespace
+    .trim()
+    .toLowerCase();
+};
+
+/**
+ * Split compound options containing / into individual alternatives.
+ * E.g., "Brand X/Y/Z" → ["brand x", "brand y", "brand z", "brand x/y/z"]
+ * E.g., "Urea / DAP" → ["urea", "dap", "urea / dap"]
+ */
+const expandSlashAlternatives = (optionText) => {
+  const normalized = normalizeForMatching(optionText);
+  const alternatives = [normalized.replace(/[/\\]/g, ' ').replace(/\s+/g, ' ').trim()]; // the full option with slashes as spaces
+
+  // Also add the original as-is (with slashes removed)
+  if (normalized.includes('/')) {
+    const parts = normalized.split('/').map(p => p.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      // Find the common prefix before the slash-separated part
+      // E.g., "brand x/y/z" → prefix could be "brand " if parts are "brand x", "y", "z"
+      // Simple heuristic: if first part has spaces and others don't, extract prefix
+      const firstWords = parts[0].split(/\s+/);
+      if (firstWords.length > 1 && parts.slice(1).every(p => !p.includes(' '))) {
+        // "brand x", "y", "z" → prefix "brand", suffix alternatives: "x", "y", "z"
+        const prefix = firstWords.slice(0, -1).join(' ');
+        const firstSuffix = firstWords[firstWords.length - 1];
+        alternatives.push(...[firstSuffix, ...parts.slice(1)].map(s => `${prefix} ${s}`));
+        // Also add bare suffixes for matching (e.g., just "x", "y", "z")
+        alternatives.push(firstSuffix, ...parts.slice(1));
+      } else {
+        // Each part is a full alternative, e.g., "urea / dap"
+        alternatives.push(...parts);
+      }
+    }
+  }
+  return [...new Set(alternatives)].filter(Boolean);
+};
+
+const resolveCallOptionIndex = (question, speechResult, digits, preferredLanguage = 'english') => {
+  const options = Array.isArray(question?.options) ? question.options : [];
+  if (options.length === 0) return -1;
+
+  // Resolve localized options too for speech matching
+  const lang = (preferredLanguage || 'english').toLowerCase();
+  const localizedOptions = Array.isArray(question?.[`options_${lang}`]) && question[`options_${lang}`].length > 0
+    ? question[`options_${lang}`]
+    : options;
+
+  const rawDigits = String(digits || '').trim();
+  if (/^\d+$/.test(rawDigits)) {
+    const selected = Number(rawDigits);
+    if (selected >= 1 && selected <= options.length) {
+      return selected - 1;
+    }
+  }
+
+  const spoken = String(speechResult || '').trim();
+  if (!spoken) return -1;
+
+  const numeric = extractNumericOptionFromTranscript(spoken, preferredLanguage, options.length);
+  if (numeric && numeric >= 1 && numeric <= options.length) {
+    return numeric - 1;
+  }
+
+  const normalizedSpeech = normalizeForMatching(spoken);
+  const normalizedSpeechNoSlash = normalizedSpeech.replace(/[/\\]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Check localized options first (native language) — exact substring match with slash expansion
+  for (let index = 0; index < localizedOptions.length; index += 1) {
+    const alts = expandSlashAlternatives(localizedOptions[index]);
+    if (alts.some(alt => alt && normalizedSpeechNoSlash.includes(alt))) {
+      return index;
+    }
+    // Also check if speech is contained within any alternative (for when speech is short, e.g., just "brand x")
+    if (alts.some(alt => alt && alt.length > 2 && normalizedSpeechNoSlash.includes(alt))) {
+      return index;
+    }
+  }
+
+  // Also check English options as fallback — exact substring match with slash expansion
+  if (localizedOptions !== options) {
+    for (let index = 0; index < options.length; index += 1) {
+      const alts = expandSlashAlternatives(options[index]);
+      if (alts.some(alt => alt && normalizedSpeechNoSlash.includes(alt))) {
+        return index;
+      }
+    }
+  }
+
+  // Fuzzy match: convert number ranges in options to words and re-check speech
+  // e.g., option "1-2 ఎకరాలు" → "ఒకటి నుండి రెండు ఎకరాలు" and see if speech contains it
+  for (let index = 0; index < localizedOptions.length; index += 1) {
+    const sanitized = sanitizeTtsText(String(localizedOptions[index] || ''), lang).toLowerCase();
+    if (sanitized && normalizedSpeechNoSlash.includes(sanitized)) {
+      return index;
+    }
+  }
+
+  // Reverse fuzzy: sanitize the speech and match against raw normalized options
+  const sanitizedSpeech = sanitizeTtsText(normalizedSpeechNoSlash, lang);
+  for (let index = 0; index < localizedOptions.length; index += 1) {
+    const alts = expandSlashAlternatives(localizedOptions[index]);
+    if (alts.some(alt => alt && sanitizedSpeech.includes(alt))) {
+      return index;
+    }
+  }
+
+  // Partial keyword match: check if key words from the option appear in the speech
+  for (let index = 0; index < localizedOptions.length; index += 1) {
+    const fullText = normalizeForMatching(localizedOptions[index]).replace(/[/\\]/g, ' ').replace(/\s+/g, ' ').trim();
+    const keywords = fullText.split(/\s+/).filter(w => w.length > 2);
+    if (keywords.length > 0) {
+      const matchCount = keywords.filter(kw => normalizedSpeechNoSlash.includes(kw)).length;
+      if (matchCount >= Math.ceil(keywords.length * 0.5)) {
+        return index;
+      }
+    }
+  }
+
+  // Last resort: check each English option's slash-expanded alternatives against localized speech
+  if (localizedOptions !== options) {
+    for (let index = 0; index < options.length; index += 1) {
+      const fullText = normalizeForMatching(options[index]).replace(/[/\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      const keywords = fullText.split(/\s+/).filter(w => w.length > 2);
+      if (keywords.length > 0) {
+        const matchCount = keywords.filter(kw => normalizedSpeechNoSlash.includes(kw)).length;
+        if (matchCount >= Math.ceil(keywords.length * 0.5)) {
+          return index;
+        }
+      }
+    }
+  }
+
+  return -1;
+};
+
+export const twilioVoiceAnswer = async (req, res) => {
+  const db = req.app.locals.mongoDb;
+
+  try {
+    const phoneNumber = normalizePhoneNumber(req.query.phone || req.body?.To || req.body?.Caller || req.body?.CallTo);
+    const surveyId = normalizeSurveyId(req.query.surveyId || DEFAULT_SURVEY_ID);
+
+    if (!phoneNumber) {
+      res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').invalidPhone, 'en-IN'));
+      return;
+    }
+
+    const farmer = await getFarmerByPhone(db, phoneNumber);
+    const ownerUserId = farmer?.ownerUserId || null;
+    const preferredLanguage = farmer?.preferredLanguage || 'english';
+    const twilioLang = getTwilioLanguage(preferredLanguage);
+
+    await createSessionForFarmer(db, phoneNumber, surveyId, ownerUserId);
+    const activeSession = await getActiveSession(db, phoneNumber, surveyId);
+    const currentQuestion = activeSession?.currentQuestion;
+    const messages = getTwilioCallMessages(preferredLanguage);
+
+    if (!activeSession || !currentQuestion) {
+      res.type('text/xml').status(200).send(renderCompletionTwiml(messages.noQuestion, twilioLang));
+      return;
+    }
+
+    const gatherActionUrl = buildTwilioVoiceWebhookUrl('gather', phoneNumber, surveyId);
+    const recordActionUrl = buildTwilioVoiceWebhookUrl('record', phoneNumber, surveyId);
+    const { prompt, speechHints: speechHintsStr } = getQuestionPromptForCall(currentQuestion, preferredLanguage);
+
+    let promptAudioUrl = await resolvePreRecordedQuestionAudioUrl(db, currentQuestion, preferredLanguage);
+    if (!promptAudioUrl) {
+      promptAudioUrl = await safeCreateTwilioPromptAudioUrl(db, prompt, preferredLanguage);
+    }
+
+    const speechReliable = isTwilioSpeechReliable(preferredLanguage);
+    console.log(`📞 Twilio voice answer: phone=${phoneNumber} lang=${preferredLanguage} speechReliable=${speechReliable}`);
+
+    res.type('text/xml').status(200).send(
+      renderGatherTwiml({
+        questionPrompt: prompt,
+        actionUrl: gatherActionUrl,
+        recordUrl: recordActionUrl,
+        promptAudioUrl,
+        fallbackNoInputMessage: messages.recordTimeout,
+        language: getTwilioLanguage(preferredLanguage),
+        speechHints: speechHintsStr,
+        optionCount: currentQuestion.options?.length || 0,
+        speechReliable,
+      })
+    );
+  } catch (error) {
+    console.error('❌ Twilio voice answer handler failed:', error?.message || error);
+    res.type('text/xml').status(200).send(renderCompletionTwiml('An error occurred while starting your quiz call. Please try again later.', 'en-IN'));
+  }
+};
+
+export const twilioVoiceGather = async (req, res) => {
+  const db = req.app.locals.mongoDb;
+
+  try {
+    const phoneNumber = normalizePhoneNumber(req.query.phone || req.body?.To || req.body?.Caller || req.body?.CallTo);
+    const surveyId = normalizeSurveyId(req.query.surveyId || DEFAULT_SURVEY_ID);
+    const digits = req.body?.Digits || '';
+    const speechResult = req.body?.SpeechResult || '';
+
+    console.log(`📞 Twilio gather received: phone=${phoneNumber} digits="${digits}" speech="${speechResult}" confidence=${req.body?.Confidence || 'N/A'}`);
+
+    if (!phoneNumber) {
+      res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').invalidPhone, 'en-IN'));
+      return;
+    }
+
+    const activeSession = await getActiveSession(db, phoneNumber, surveyId);
+    const currentQuestion = activeSession?.currentQuestion;
+
+    if (!activeSession || !currentQuestion) {
+      res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').noQuestion, 'en-IN'));
+      return;
+    }
+
+    const farmer = await getFarmerByPhone(db, phoneNumber);
+    const preferredLanguage = farmer?.preferredLanguage || 'english';
+    const twilioLang = getTwilioLanguage(preferredLanguage);
+    const messages = getTwilioCallMessages(preferredLanguage);
+    const selectedOptionIndex = resolveCallOptionIndex(currentQuestion, speechResult, digits, preferredLanguage);
+
+    if (selectedOptionIndex < 0 || selectedOptionIndex >= (currentQuestion.options?.length || 0)) {
+      const retryUrl = buildTwilioVoiceWebhookUrl('answer', phoneNumber, surveyId);
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say language="${xmlEscape(twilioLang)}">${xmlEscape(messages.retry)}</Say>\n  <Redirect method="POST">${xmlEscape(retryUrl)}</Redirect>\n</Response>`;
+      res.type('text/xml').status(200).send(twiml);
+      return;
+    }
+
+    // Skip confirmation announcement — move directly to the next question for a smoother flow
+    const twiml = await processTwilioSelectedAnswer({
+      db,
+      phoneNumber,
+      surveyId,
+      activeSession,
+      currentQuestion,
+      selectedOptionIndex,
+      preferredLanguage,
+      confirmationMessage: '',
+    });
+
+    res.type('text/xml').status(200).send(twiml);
+  } catch (error) {
+    console.error('❌ Twilio voice gather handler failed:', error?.message || error);
+    res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').processError, 'en-IN'));
+  }
+};
+
+export const twilioVoiceRecord = async (req, res) => {
+  const db = req.app.locals.mongoDb;
+
+  try {
+    const phoneNumber = normalizePhoneNumber(req.query.phone || req.body?.To || req.body?.Caller || req.body?.CallTo);
+    const surveyId = normalizeSurveyId(req.query.surveyId || DEFAULT_SURVEY_ID);
+
+    if (!phoneNumber) {
+      res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').invalidPhone, 'en-IN'));
+      return;
+    }
+
+    const activeSession = await getActiveSession(db, phoneNumber, surveyId);
+    const currentQuestion = activeSession?.currentQuestion;
+    if (!activeSession || !currentQuestion) {
+      res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').noQuestion, 'en-IN'));
+      return;
+    }
+
+    const farmer = await getFarmerByPhone(db, phoneNumber);
+    const preferredLanguage = farmer?.preferredLanguage || 'english';
+    const twilioLang = getTwilioLanguage(preferredLanguage);
+    const messages = getTwilioCallMessages(preferredLanguage);
+    const recordActionUrl = buildTwilioVoiceWebhookUrl('record', phoneNumber, surveyId);
+    const retryUrl = buildTwilioVoiceWebhookUrl('answer', phoneNumber, surveyId);
+    const recordingUrl = String(req.body?.RecordingUrl || '').trim();
+
+    if (!recordingUrl) {
+      // No need to replay the question — farmer already heard it in the <Gather> TwiML
+      res.type('text/xml').status(200).send(
+        renderRecordTwiml({
+          actionUrl: recordActionUrl,
+          recordPrompt: messages.recordPrompt,
+          noRecordingMessage: messages.recordTimeout,
+          language: twilioLang,
+        })
+      );
+      return;
+    }
+
+    const sttProvider = String(process.env.STT_PROVIDER || 'sarvam').toLowerCase();
+    if (sttProvider !== 'groq' && sttProvider !== 'sarvam') {
+      throw new Error('Twilio call STT requires STT_PROVIDER=groq or STT_PROVIDER=sarvam');
+    }
+
+    const audioBuffer = await fetchTwilioRecordingBuffer(recordingUrl);
+    const upload = await storeUploadedFile(
+      db,
+      audioBuffer,
+      `twilio_call_${req.body?.CallSid || Date.now()}.wav`,
+      'audio/wav',
+      {
+        phoneNumber,
+        sessionId: activeSession.sessionId,
+        questionId: currentQuestion.id,
+        source: 'twilio_call',
+        twilioCallSid: req.body?.CallSid || null,
+      }
+    );
+
+    // Pass the farmer's preferred language to STT for accurate transcription
+    const transcriptionResult = await withTimeout(
+      transcribeAudio(db, upload.audioId, preferredLanguage),
+      getTwilioRecordSttTimeoutMs(),
+      `Twilio record STT timed out after ${getTwilioRecordSttTimeoutMs()}ms`
+    );
+    const transcriptText = String(transcriptionResult?.text || '').trim();
+
+    // Try text-based matching first
+    let selectedOptionIndex = resolveCallOptionIndex(currentQuestion, transcriptText, '', preferredLanguage);
+
+    // If text-based matching failed, try AI-based matching
+    if (selectedOptionIndex < 0 || selectedOptionIndex >= (currentQuestion.options?.length || 0)) {
+      if (transcriptText) {
+        try {
+          console.log(`🤖 Attempting AI match for call recording: "${transcriptText}"`);
+          const aiMatch = await matchVoiceToOption(transcriptText, currentQuestion);
+          if (aiMatch && aiMatch.index >= 0 && aiMatch.confidence >= Number(process.env.TRANSCRIPTION_CONFIDENCE_THRESHOLD || 0.6)) {
+            selectedOptionIndex = aiMatch.index;
+            console.log(`✅ AI match succeeded: option=${selectedOptionIndex} confidence=${aiMatch.confidence}`);
+          }
+        } catch (aiErr) {
+          console.warn('⚠️ AI matching failed for call recording:', aiErr?.message || aiErr);
+        }
+      }
+    }
+
+    if (selectedOptionIndex < 0 || selectedOptionIndex >= (currentQuestion.options?.length || 0)) {
+      // Could not understand — ask to repeat in the selected language
+      const didntUnderstandMsgs = {
+        telugu: 'క్షమించండి, నేను అర్థం చేసుకోలేకపోయాను. దయచేసి మీ సమాధానాన్ని మరోసారి చెప్పగలరా.',
+        hindi: 'क्षमा करें, मैं समझ नहीं पाया। कृपया अपना उत्तर एक बार फिर बताइए।',
+        kannada: 'ಕ್ಷಮಿಸಿ, ನನಗೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಮತ್ತೊಮ್ಮೆ ಹೇಳಬಹುದೇ.',
+        english: 'Sorry, I did not understand. Could you please repeat your answer once more.',
+      };
+      const retryMsg = didntUnderstandMsgs[preferredLanguage.toLowerCase()] || didntUnderstandMsgs.english;
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say language="${xmlEscape(twilioLang)}">${xmlEscape(retryMsg)}</Say>\n  <Redirect method="POST">${xmlEscape(retryUrl)}</Redirect>\n</Response>`;
+      res.type('text/xml').status(200).send(twiml);
+      return;
+    }
+
+    // Skip confirmation announcement — move directly to the next question for a smoother flow
+    const twiml = await processTwilioSelectedAnswer({
+      db,
+      phoneNumber,
+      surveyId,
+      activeSession,
+      currentQuestion,
+      selectedOptionIndex,
+      preferredLanguage,
+      confirmationMessage: '',
+    });
+
+    res.type('text/xml').status(200).send(twiml);
+  } catch (error) {
+    console.error('❌ Twilio voice record handler failed:', error?.message || error);
+    res.type('text/xml').status(200).send(renderCompletionTwiml(getTwilioCallMessages('english').processError, 'en-IN'));
+  }
+};
+
+export const twilioVoiceAudioFile = async (req, res) => {
+  try {
+    const db = req.app.locals.mongoDb;
+    const audioId = String(req.params.audioId || '').trim();
+    if (!audioId) {
+      return res.status(404).send('Audio not found');
+    }
+
+    const audio = await getCollection(db, 'audio').findOne({ id: audioId });
+    if (!audio || !audio.filePath) {
+      return res.status(404).send('Audio not found');
+    }
+
+    if (!fs.existsSync(audio.filePath)) {
+      return res.status(404).send('Audio file missing');
+    }
+
+    res.setHeader('Content-Type', audio.mimeType || 'audio/wav');
+    res.setHeader('Content-Disposition', `inline; filename="${audio.fileName || `${audioId}.wav`}"`);
+    const stream = fs.createReadStream(audio.filePath);
+    stream.on('error', () => {
+      if (!res.headersSent) res.status(500).end();
+    });
+    stream.pipe(res);
+  } catch (error) {
+    console.error('❌ Twilio audio stream handler failed:', error?.message || error);
+    if (!res.headersSent) res.status(500).send('Unable to stream audio');
   }
 };
 
@@ -1008,13 +2233,20 @@ const handleStartMessage = async (db, phoneNumber, message = {}, explicitLanguag
     console.log(`🔤 Detected/preferred language: ${preferredLanguage} (profileName="${profileName}" explicit=${explicitLanguage})`);
 
     if (explicitLanguage) {
-      await sendMessage(phoneNumber, `✅ Language set to ${explicitLanguage}. Continuing in ${explicitLanguage}.`);
+      const langConfirmMsgs = {
+        telugu: '✅ భాష తెలుగుకు సెట్ చేయబడింది. తెలుగులో కొనసాగుతున్నాము.',
+        hindi: '✅ भाषा हिंदी में सेट की गयी। हिंदी में जारी रखते हैं।',
+        kannada: '✅ ಭಾಷೆ ಕನ್ನಡಕ್ಕೆ ಹೊಂದಿಸಲಾಗಿದೆ. ಕನ್ನಡದಲ್ಲಿ ಮುಂದುವರಿಯುತ್ತೇವೆ.',
+        english: `✅ Language set to ${explicitLanguage}. Continuing in ${explicitLanguage}.`,
+      };
+      await sendMessage(phoneNumber, langConfirmMsgs[preferredLanguage] || langConfirmMsgs.english);
     }
 
     await startSurvey(db, phoneNumber, farmer, farmer?.region, preferredLanguage, !!explicitLanguage, targetSurveyId);
   } catch (error) {
     console.error('❌ Error handling START message:', error.message);
-    await sendMessage(phoneNumber, '❌ Error during onboarding. Please try again.');
+    const errLangOnboard = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorOnboarding', errLangOnboard));
   }
 };
 
@@ -1073,7 +2305,11 @@ const startSurvey = async (db, phoneNumber, farmer, regionHint = 'telangana', pr
   const targetSurveyId = normalizeSurveyId(surveyId);
   await createSessionForFarmer(db, phoneNumber, targetSurveyId);
   await sendLanguagePrompt(phoneNumber, preferredLanguage);
-  setTimeout(() => startNewSession(db, phoneNumber, targetSurveyId), 1000);
+  setTimeout(() => {
+    startNewSession(db, phoneNumber, targetSurveyId).catch((err) => {
+      console.error(`❌ startNewSession failed for ${phoneNumber}:`, err.message || err);
+    });
+  }, 1000);
 };
 
 /**
@@ -1151,7 +2387,8 @@ const startNewSession = async (db, phoneNumber, surveyId = DEFAULT_SURVEY_ID, fo
     console.log(`📝 Sent first question: ${toSendQ.id} (lang=${preferredLanguage})`);
   } catch (error) {
     console.error('❌ Error starting session:', error.message);
-    await sendMessage(phoneNumber, '❌ Error starting survey. Please try "START" again.');
+    const errLangStart = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorStarting', errLangStart));
   }
 };
 
@@ -1172,7 +2409,8 @@ const sendCurrentQuestion = async (db, phoneNumber, sessionId) => {
     await sendQuestionMessage(db, phoneNumber, q, preferredLanguage);
   } catch (error) {
     console.error('❌ Error sending current question:', error.message);
-    await sendMessage(phoneNumber, '❌ Error sending the current question. Please try again.');
+    const errLangQ = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorSendingQuestion', errLangQ));
   }
 };
 
@@ -1193,7 +2431,8 @@ const handleMCQResponse = async (db, phoneNumber, selectedOption) => {
       }
 
       if (!session) {
-        await sendMessage(phoneNumber, '⚠️ No active session. Reply "START" to begin survey.');
+        const farmerLangNoSession = (await getFarmerByPhone(db, phoneNumber))?.preferredLanguage || 'english';
+        await sendMessage(phoneNumber, getLocalizedSurveyMessage('noActiveSession', farmerLangNoSession));
         return;
       }
 
@@ -1213,16 +2452,18 @@ const handleMCQResponse = async (db, phoneNumber, selectedOption) => {
       const refreshed = await getActiveSession(db, phoneNumber, surveyId || DEFAULT_SURVEY_ID) || await getActiveSession(db, phoneNumber);
       currentQ = refreshed?.currentQuestion || null;
       if (!currentQ) {
-        await sendMessage(phoneNumber, '⚠️ No active question found. Reply "START" to begin survey.');
+        const farmerLangNoQ = (await getFarmerByPhone(db, phoneNumber))?.preferredLanguage || 'english';
+        await sendMessage(phoneNumber, getLocalizedSurveyMessage('noActiveQuestion', farmerLangNoQ));
         return;
       }
     }
 
     // Validate option is within range
     if (selectedOption < 1 || selectedOption > currentQ.options.length) {
+      const farmerLang = (await getFarmerByPhone(db, phoneNumber))?.preferredLanguage || 'english';
       await sendMessage(
         phoneNumber,
-        `❌ Invalid option. Please choose 1-${currentQ.options.length}`
+        getLocalizedSurveyMessage('invalidOption', farmerLang, { n: currentQ.options.length })
       );
       return;
     }
@@ -1240,8 +2481,14 @@ const handleMCQResponse = async (db, phoneNumber, selectedOption) => {
       `✅ Answer saved: ${phoneNumber} -> Q${currentQ.id} = ${selectedText}`
     );
 
-    // Send short confirmation message in requested style
-    await sendMessage(phoneNumber, `Your answer is ${selectedText}`);
+    // Send short confirmation message in the selected language
+    const farmerLangForConfirm = (await getFarmerByPhone(db, phoneNumber))?.preferredLanguage || 'english';
+    const confirmLang = farmerLangForConfirm.toLowerCase();
+    const localizedOptsForConfirm = Array.isArray(currentQ?.[`options_${confirmLang}`]) && currentQ[`options_${confirmLang}`].length > 0
+      ? currentQ[`options_${confirmLang}`]
+      : currentQ.options;
+    const localizedSelectedText = localizedOptsForConfirm[selectedIdx] || selectedText;
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('answerConfirm', farmerLangForConfirm, { answer: localizedSelectedText }));
 
     // If this was the location question, update the Farmer.region and link to Region node
     try {
@@ -1286,6 +2533,8 @@ const handleMCQResponse = async (db, phoneNumber, selectedOption) => {
     const nextQ = await getNextQuestion(db, currentQ.id, selectedIdx, ownerUserId || null, surveyId || DEFAULT_SURVEY_ID);
 
     if (nextQ) {
+      // Small delay so the confirmation message arrives before the next question
+      await new Promise(resolve => setTimeout(resolve, 800));
       // Send next question
       const farmer = await getFarmerByPhone(db, phoneNumber);
       const preferredLanguage = farmer?.preferredLanguage || 'english';
@@ -1294,14 +2543,16 @@ const handleMCQResponse = async (db, phoneNumber, selectedOption) => {
     } else {
       // Survey completed
       await completeSession(db, phoneNumber, sessionId);
+      const completeLang = (await getFarmerByPhone(db, phoneNumber))?.preferredLanguage || 'english';
       await sendMessage(
         phoneNumber,
-        '✅ Survey completed! Thank you for your responses. We will analyze and share insights soon.'
+        getLocalizedSurveyMessage('surveyComplete', completeLang)
       );
     }
   } catch (error) {
     console.error('❌ Error handling MCQ response:', error.message);
-    await sendMessage(phoneNumber, '❌ Error processing response. Please try again.');
+    const errLang = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorProcessing', errLang));
   }
 };
 
@@ -1357,50 +2608,40 @@ const handleAudioResponse = async (db, phoneNumber, message) => {
 
     const mediaId = message.audio?.id;
     if (!mediaId) {
-      await sendMessage(phoneNumber, '⚠️ Audio received without media ID. Please try again.');
+      const farmerLangAudio = (await getFarmerByPhone(db, phoneNumber))?.preferredLanguage || 'english';
+      await sendMessage(phoneNumber, getLocalizedSurveyMessage('audioNoMediaId', farmerLangAudio));
       return;
     }
 
-    // Store the audio file
+    // Determine response mode early
+    const farmer = await getFarmerByPhone(db, phoneNumber);
+    const responseMode = farmer?.responseMode || 'text';
+    const preferredLanguage = (farmer?.preferredLanguage || 'english').toLowerCase();
+
+    // Store the audio file — skip background auto-transcription since we handle it here
     const audioMeta = await storeAudioFile(db, mediaId, {
       phoneNumber,
       sessionId,
       questionId: currentQuestion.id,
       timestamp: message.timestamp,
-    });
+    }, { skipAutoTranscription: true });
 
-    // Save a pending voice answer
-    await saveVoiceAnswer(db, phoneNumber, sessionId, currentQuestion.id, audioMeta.audioId, ownerUserId || null, surveyId || DEFAULT_SURVEY_ID);
-
-    // Determine response mode
-    const farmer = await getFarmerByPhone(db, phoneNumber);
-    const responseMode = farmer?.responseMode || 'text';
-
-    if (responseMode !== 'audio') {
-      // Text-mode: still require manual numeric confirmation
-      await sendMessage(
-        phoneNumber,
-        '✅ Voice note received. Please reply with the option number to confirm your answer.'
-      );
-      return;
-    }
-
-    // ── Audio mode: auto-transcribe and match ──
+    // ── Always transcribe the voice note (both text and audio mode) ──
     const processingMsgs = {
       telugu: '🔄 మీ వాయిస్ నోట్‌ను ప్రాసెస్ చేయడం...',
       hindi: '🔄 आपका वॉइस नोट प्रॉसेस किया जा रहा है...',
       kannada: '🔄 ನಿಮ್ಮ ವಾಯ್ಸ್ ನೋಟನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ...',
       english: '🔄 Processing your voice note...',
     };
-    const processingMsg = processingMsgs[(farmer?.preferredLanguage || 'english').toLowerCase()] || processingMsgs.english;
+    const processingMsg = processingMsgs[preferredLanguage] || processingMsgs.english;
     await sendMessage(phoneNumber, processingMsg);
 
     let transcriptText = null;
     let matchFromTranscription = null;
     try {
       const { transcribeAudio: transcribeAudioFn } = await import('../services/audioService.js');
-      const preferredLang = farmer?.preferredLanguage || 'english';
-      const result = await transcribeAudioFn(db, audioMeta.audioId, preferredLang);
+      // Pass the farmer's preferred language for accurate STT transcription
+      const result = await transcribeAudioFn(db, audioMeta.audioId, preferredLanguage);
       transcriptText = result?.text || null;
       matchFromTranscription = result?.match || null;
     } catch (err) {
@@ -1408,14 +2649,15 @@ const handleAudioResponse = async (db, phoneNumber, message) => {
     }
 
     if (!transcriptText && !matchFromTranscription) {
-      // Transcription failed — ask user to try again with voice or fall back to number
+      // Transcription failed — save a pending voice answer and ask user to retry or type number
+      await saveVoiceAnswer(db, phoneNumber, sessionId, currentQuestion.id, audioMeta.audioId, ownerUserId || null, surveyId || DEFAULT_SURVEY_ID);
       const failedMsgs = {
-        telugu: '⚠️ మాఫ్ చేయండి, మీ వాయిస్ నోట్‌ను అర్థం చేసుకోలేకపోయాను. దయచేసి క్లియర్ రికార్డింగ్‌తో మళ్ళీ ప్రయత్నించండి, లేదా ఎంపిక సంఖ్యతో జవాబు చెప్పండి.',
-        hindi: '⚠️ क्षमा करें, मैं आपका वॉइस नोट समझ नहीं पाया। कृपया साफ़ रिकॉर्डिंग के साथ फिर से प्रयास करें, या विकल्प संख्या भेजें।',
-        kannada: '⚠️ ಕ್ಷಮಿಸಿ, ನಿಮ್ಮ ವಾಯ್ಸ್ ನೋಟನ್ನು ನಾನು ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟ ದಾಖಲನೊಂದಿಗೆ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ಆಯ್ಕೆ ಸಂಖ್ಯೆಗಳನ್ನು ಕಳುಹಿಸಿ.',
-        english: '⚠️ Sorry, I could not understand your voice note. Please try again with a clearer recording, or reply with the option number.',
+        telugu: '⚠️ క్షమించండి, నేను అర్థం చేసుకోలేకపోయాను. దయచేసి మీ సమాధానాన్ని మరోసారి చెప్పగలరా, లేదా ఎంపిక సంఖ్యతో జవాబు చెప్పండి.',
+        hindi: '⚠️ क्षमा करें, मैं समझ नहीं पाया। कृपया अपना उत्तर एक बार फिर से बताइए, या विकल्प संख्या भेजें।',
+        kannada: '⚠️ ಕ್ಷಮಿಸಿ, ನನಗೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಮತ್ತೊಮ್ಮೆ ಹೇಳಬಹುದೇ, ಅಥವಾ ಆಯ್ಕೆ ಸಂಖ್ಯೆಗಳನ್ನು ಕಳುಹಿಸಿ.',
+        english: '⚠️ Sorry, I didn\'t understand. Could you please repeat your answer once more, or reply with the option number.',
       };
-      const fm = failedMsgs[(farmer?.preferredLanguage || 'english').toLowerCase()] || failedMsgs.english;
+      const fm = failedMsgs[preferredLanguage] || failedMsgs.english;
       await sendMessage(phoneNumber, fm);
       return;
     }
@@ -1442,7 +2684,7 @@ const handleAudioResponse = async (db, phoneNumber, message) => {
     if (transcriptText) {
       const numericOption = extractNumericOptionFromTranscript(
         transcriptText,
-        farmer?.preferredLanguage,
+        preferredLanguage,
         currentQuestion.options.length
       );
       if (numericOption && (matchedIdx < 0 || matchConfidence < confidenceThreshold)) {
@@ -1453,26 +2695,48 @@ const handleAudioResponse = async (db, phoneNumber, message) => {
     }
 
     if (matchedIdx < 0 || matchConfidence < confidenceThreshold) {
-      // Low confidence — ask to retry
-      const preferredLanguage = farmer?.preferredLanguage || 'english';
-      const optionsList = currentQuestion.options.map((o, i) => `${i + 1}. ${o}`).join('\n');
-      await sendMessage(
-        phoneNumber,
-        `⚠️ I heard: "${transcriptText}" but could not confidently match it to an option.\n\nPlease send another voice note or reply with the number:\n${optionsList}`
-      );
+      // Low confidence — save a pending voice answer and ask to repeat in selected language
+      await saveVoiceAnswer(db, phoneNumber, sessionId, currentQuestion.id, audioMeta.audioId, ownerUserId || null, surveyId || DEFAULT_SURVEY_ID);
+      const lang = preferredLanguage.toLowerCase();
+      const localizedOpts = Array.isArray(currentQuestion?.[`options_${lang}`]) && currentQuestion[`options_${lang}`].length > 0
+        ? currentQuestion[`options_${lang}`]
+        : currentQuestion.options;
+      const optionsList = localizedOpts.map((o, i) => `${i + 1}. ${o}`).join('\n');
+      const retryMsgs = {
+        telugu: `⚠️ క్షమించండి, నేను అర్థం చేసుకోలేకపోయాను. దయచేసి మీ సమాధానాన్ని మరోసారి చెప్పగలరా, లేదా సంఖ్యతో జవాబు ఇవ్వండి:\n${optionsList}`,
+        hindi: `⚠️ क्षमा करें, मैं समझ नहीं पाया। कृपया अपना उत्तर एक बार फिर से बताइए, या संख्या से जवाब दें:\n${optionsList}`,
+        kannada: `⚠️ ಕ್ಷಮಿಸಿ, ನನಗೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಉತ್ತರವನ್ನು ಮತ್ತೊಮ್ಮೆ ಹೇಳಬಹುದೇ, ಅಥವಾ ಸಂಖ್ಯೆಯಿಂದ ಉತ್ತರಿಸಿ:\n${optionsList}`,
+        english: `⚠️ Sorry, I didn’t understand. Could you please repeat your answer once more, or reply with the option number:\n${optionsList}`,
+      };
+      await sendMessage(phoneNumber, retryMsgs[preferredLanguage] || retryMsgs.english);
       return;
     }
 
-    // High confidence match — auto-confirm the answer
+    // High confidence match — save ONE confirmed answer (no duplicate VOICE_PENDING)
     const selectedOption = currentQuestion.options[matchedIdx];
-    await updateAnswerSelection(db, `ans_${audioMeta.audioId}`, matchedIdx).catch(async () => {
-      // If the pending answer ID doesn't match, find it by audioId
-      const pending = await getCollection(db, 'answers').findOne({ audioId: audioMeta.audioId });
-      if (pending) await updateAnswerSelection(db, pending.id, matchedIdx);
-    });
-
-    // Save the confirmed answer properly
+    // Use localized option text for the confirmation message
+    const voiceLang = preferredLanguage.toLowerCase();
+    const localizedOptsVoice = Array.isArray(currentQuestion?.[`options_${voiceLang}`]) && currentQuestion[`options_${voiceLang}`].length > 0
+      ? currentQuestion[`options_${voiceLang}`]
+      : currentQuestion.options;
+    const localizedSelectedOption = localizedOptsVoice[matchedIdx] || selectedOption;
     await saveAnswer(db, phoneNumber, sessionId, currentQuestion.id, matchedIdx, ownerUserId || null, surveyId || DEFAULT_SURVEY_ID);
+
+    // Also store audioId link on the answer for QC/traceability
+    try {
+      const latestAnswer = await getCollection(db, 'answers').findOne(
+        { phoneNumber, sessionId, questionId: currentQuestion.id, selectedOptionIndex: matchedIdx },
+        { sort: { createdAt: -1 } }
+      );
+      if (latestAnswer) {
+        await getCollection(db, 'answers').updateOne(
+          { id: latestAnswer.id },
+          { $set: { audioId: audioMeta.audioId, responseMode: 'voice', confidence: matchConfidence } }
+        );
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to link audioId to confirmed answer:', err.message);
+    }
 
     // If this was Q_LOCATION, update farmer region (same logic as MCQ handler)
     try {
@@ -1500,46 +2764,47 @@ const handleAudioResponse = async (db, phoneNumber, message) => {
 
     await sendMessage(
       phoneNumber,
-      `Your answer is ${selectedOption}`
+      getLocalizedSurveyMessage('answerConfirm', preferredLanguage, { answer: localizedSelectedOption })
     );
 
     console.log(`✅ Voice answer auto-confirmed: ${phoneNumber} -> ${currentQuestion.id} = ${selectedOption} (confidence: ${matchConfidence.toFixed(2)})`);
 
     // Advance to next question
     const nextQ = await getNextQuestion(db, currentQuestion.id, matchedIdx, ownerUserId || null, surveyId || DEFAULT_SURVEY_ID);
-    const preferredLanguage = farmer?.preferredLanguage || 'english';
 
     if (nextQ) {
       // Small delay so the confirmation message arrives before the next question
       await new Promise(resolve => setTimeout(resolve, 800));
       await sendQuestionMessage(db, phoneNumber, nextQ, preferredLanguage);
-      console.log(`📝 Sent next question (audio): ${nextQ.id}`);
+      console.log(`📝 Sent next question (voice): ${nextQ.id}`);
     } else {
       // Survey completed
       await completeSession(db, phoneNumber, sessionId);
 
-      // Send completion as voice note too
-      const completionText = 'Thank you! The survey is now complete. We will analyze your responses and share insights soon.';
-      let sentCompletionAudio = false;
-      try {
-        const ttsResult = await synthesizeText(completionText, { lang: preferredLanguage, format: process.env.TTS_FORMAT || 'mp3' });
-        if (ttsResult) {
-          await sendWhatsAppAudio(phoneNumber, ttsResult.filePath, ttsResult.mimeType);
-          sentCompletionAudio = true;
+      // Send completion as voice note too (in audio mode)
+      if (responseMode === 'audio') {
+        const completionText = getLocalizedSurveyMessage('surveyCompleteTts', preferredLanguage);
+        let sentCompletionAudio = false;
+        try {
+          const ttsResult = await synthesizeText(completionText, { lang: preferredLanguage, format: process.env.TTS_FORMAT || 'mp3' });
+          if (ttsResult) {
+            await sendWhatsAppAudio(phoneNumber, ttsResult.filePath, ttsResult.mimeType);
+            sentCompletionAudio = true;
+          }
+        } catch (err) {
+          // fallback to text
         }
-      } catch (err) {
-        // fallback to text
-      }
-      if (!sentCompletionAudio) {
-        await sendMessage(
-          phoneNumber,
-          '✅ Survey completed! Thank you for your responses. We will analyze and share insights soon.'
-        );
+        if (!sentCompletionAudio) {
+          await sendMessage(phoneNumber, getLocalizedSurveyMessage('surveyComplete', preferredLanguage));
+        }
+      } else {
+        await sendMessage(phoneNumber, getLocalizedSurveyMessage('surveyComplete', preferredLanguage));
       }
     }
   } catch (error) {
     console.error('❌ Error handling audio response:', error.message);
-    await sendMessage(phoneNumber, '❌ Error processing voice note. Please try again.');
+    const errLangAudio = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorVoice', errLangAudio));
   }
 };
 
@@ -1547,24 +2812,46 @@ const handleAudioResponse = async (db, phoneNumber, message) => {
  * AI-match a transcript string to question options using Groq LLM
  * Returns { index, confidence, note }
  */
+// Singleton Groq client — lazily initialized once
+let _groqClient = null;
+const getGroqClient = async () => {
+  if (!_groqClient) {
+    const Groq = (await import('groq-sdk')).default;
+    _groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+  return _groqClient;
+};
+
 const matchVoiceToOption = async (transcript, question) => {
-  const Groq = (await import('groq-sdk')).default;
-  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const client = await getGroqClient();
   const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
-  const prompt = `You are a strict option classifier for a farmer survey.
+  // Build a comprehensive option list including English and all available localized names
+  const allLangs = ['telugu', 'hindi', 'kannada', 'marathi', 'tamil'];
+  const localizedBlock = allLangs
+    .filter(lang => Array.isArray(question[`options_${lang}`]) && question[`options_${lang}`].length > 0)
+    .map(lang => `  ${lang}: ${JSON.stringify(question[`options_${lang}`])}`)
+    .join('\n');
+
+  const prompt = `You are a strict option classifier for a farmer survey conducted in India.
 
 The farmer was asked: "${question.text}"
-The available options are: ${JSON.stringify(question.options)}
-The farmer replied (voice transcription): "${transcript}"
+The available options (English): ${JSON.stringify(question.options)}
+${localizedBlock ? `Localized option names:\n${localizedBlock}` : ''}
+The farmer replied (voice transcription, may be in any Indian language or mixed language): "${transcript}"
 
-Based on the transcription, determine which option (zero-based index) the farmer intended to select.
-Consider partial matches, synonyms, and the local language context.
+IMPORTANT RULES:
+- Brand names, product names, and proper nouns may be transliterated, misspelled, or spoken in a mix of English and local language. For example "బ్రాండ్ ఎక్స్" = "Brand X", "ब्रांड वाई" = "Brand Y".
+- Consider phonetic similarity: the transcription is from speech recognition and may have errors, especially for brand names or English words spoken with Indian language accents.
+- Slashes (/) in option names like "Brand X/Y/Z" mean the farmer could say any one of them.
+- Match partial keywords — if the farmer says just one brand name from a compound option, that counts.
+- Consider synonyms, abbreviations, and colloquial forms in Telugu, Hindi, Kannada, Tamil, Marathi, and English.
 If the transcript clearly matches an option, return high confidence.
 If it is ambiguous, return lower confidence.
 If no option matches at all, return index -1.
 
-Respond ONLY with valid JSON: {"index": <number>, "confidence": <0-1>, "note": "<brief reason>"}`;
+Respond ONLY with valid JSON: {"index": <number>, "confidence": <0-1>, "note": "<brief reason>"}
+where index is zero-based.`;
 
   const completion = await client.chat.completions.create({
     model,
@@ -1658,17 +2945,20 @@ const getActiveSession = async (db, phoneNumber, surveyId = null) => {
       // Pending voice answers are stored with selectedOptionIndex = -1.
       // Treat them as “still on the same question” so the session doesn't advance prematurely.
       if (!isNumericIdx || selectedIdx === -1) {
-        currentQuestion = await getQuestionById(db, lastAnswer.questionId, sessionOwnerUserId, sessionSurveyId);
+        currentQuestion = await getQuestionByIdWithFallback(db, lastAnswer.questionId, sessionSurveyId, sessionOwnerUserId);
       } else {
         currentQuestion = await getNextQuestion(db, lastAnswer.questionId, selectedIdx, sessionOwnerUserId, sessionSurveyId);
+        if (!currentQuestion && sessionOwnerUserId) {
+          currentQuestion = await getNextQuestion(db, lastAnswer.questionId, selectedIdx, null, sessionSurveyId);
+        }
       }
     } else {
-      currentQuestion = await getFirstQuestion(db, sessionOwnerUserId, sessionSurveyId);
+      currentQuestion = await getFirstQuestionWithFallback(db, sessionSurveyId, sessionOwnerUserId);
     }
 
     // Defensive fallback: if question lookup fails for any reason, restart from first.
     if (!currentQuestion) {
-      currentQuestion = await getFirstQuestion(db, sessionOwnerUserId, sessionSurveyId);
+      currentQuestion = await getFirstQuestionWithFallback(db, sessionSurveyId, sessionOwnerUserId);
     }
 
     return { sessionId, currentQuestion, ownerUserId: sessionOwnerUserId, surveyId: sessionSurveyId };
@@ -1754,14 +3044,6 @@ const sendIntroductionMessage = async (phoneNumber) => {
 Tap a language to continue, or reply START to begin.`;
   try {
     await sendLanguageSelectionList(phoneNumber, body);
-
-    // Offer response mode selection (Audio vs Text) as a follow-up
-    try {
-      await sendModeSelectionButtons(phoneNumber, 'english');
-    } catch (err) {
-      // Non-fatal: if mode buttons fail, continue silently
-      console.warn('⚠️ Failed to send mode selection buttons:', err.message);
-    }
   } catch (err) {
     console.error('❌ Failed to send introduction:', err.message);
     await sendMessage(phoneNumber, '👋 Welcome to the Farmer Survey! Reply START to begin.');
@@ -1801,10 +3083,12 @@ const sendInviteTemplateMessage = async (phoneNumber) => {
     return { sent: false, reason: 'invalid_phone' };
   }
 
-  const templateName = String(INVITE_TEMPLATE_NAME || '').trim();
+  const templateName = getInviteTemplateName();
   if (!templateName) {
     return { sent: false, reason: 'missing_template_name' };
   }
+
+  const templateLang = getInviteTemplateLang();
 
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
@@ -1823,7 +3107,7 @@ const sendInviteTemplateMessage = async (phoneNumber) => {
     type: 'template',
     template: {
       name: templateName,
-      language: { code: INVITE_TEMPLATE_LANG },
+      language: { code: templateLang },
     },
   };
 
@@ -2036,6 +3320,123 @@ const sendContinueOrChangeButtons = async (phoneNumber, preferredLanguage) => {
   }
 };
 
+const sendQuizChannelSelectionButtons = async (phoneNumber, preferredLanguage = 'english') => {
+  try {
+    const to = normalizePhoneNumber(phoneNumber);
+    if (!to) {
+      console.error('❌ Cannot send channel selection: invalid phone number', phoneNumber);
+      return { fallback: true };
+    }
+
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
+    const apiVersion = process.env.WHATSAPP_API_VERSION || 'v24.0';
+    const apiBase = process.env.WHATSAPP_API_BASE_URL || 'https://graph.facebook.com';
+
+    if (!phoneId || !accessToken) {
+      return { fallback: true };
+    }
+
+    const endpoint = `${apiBase}/${apiVersion}/${phoneId}/messages`;
+    const lang = (preferredLanguage || 'english').toLowerCase();
+    const bodyByLang = {
+      telugu: 'మీరు క్విజ్‌ను ఎలా కొనసాగించాలనుకుంటున్నారు? WhatsApp లోనా లేక Phone Call లోనా?',
+      hindi: 'आप क्विज़ कैसे लेना चाहते हैं? व्हाट्सऐप पर या फोन कॉल पर?',
+      kannada: 'ನೀವು ಕ್ವಿಜ್ ಅನ್ನು ಹೇಗೆ ತೆಗೆದುಕೊಳ್ಳಲು ಬಯಸುತ್ತೀರಿ? WhatsApp ಅಥವಾ Phone Call?',
+      english: 'How would you like to take the quiz? On WhatsApp or on a phone call?',
+    };
+
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: bodyByLang[lang] || bodyByLang.english },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: 'action_channel_whatsapp', title: 'WhatsApp Quiz' } },
+            { type: 'reply', reply: { id: 'action_channel_call', title: 'Phone Call Quiz' } },
+          ],
+        },
+      },
+    };
+
+    await axios.post(endpoint, payload, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    });
+
+    return { fallback: false };
+  } catch (error) {
+    if (isPermissionError(error)) {
+      await sendMessage(phoneNumber, 'Reply with WHATSAPP to take quiz on WhatsApp, or CALL to take quiz by phone call.');
+      return { fallback: true };
+    }
+
+    throw error;
+  }
+};
+
+const handleQuizChannelSelection = async (db, phoneNumber, channel) => {
+  const normalizedChannel = String(channel || '').trim().toLowerCase();
+  const farmers = getCollection(db, 'farmers');
+  const farmer = await getFarmerByPhone(db, phoneNumber);
+  const preferredLanguage = farmer?.preferredLanguage || 'english';
+  const targetSurveyId = normalizeSurveyId(farmer?.lastInvitedSurveyId || DEFAULT_SURVEY_ID);
+
+  await farmers.updateOne(
+    { phoneNumber },
+    {
+      $set: {
+        preferredChannel: normalizedChannel === 'call' ? 'call' : 'whatsapp',
+        ...(normalizedChannel === 'call' ? { responseMode: 'call' } : {}),
+        updatedAt: new Date(),
+      },
+      $setOnInsert: { createdAt: new Date() },
+    },
+    { upsert: true }
+  );
+
+  if (normalizedChannel === 'call') {
+    await createSessionForFarmer(db, phoneNumber, targetSurveyId, farmer?.ownerUserId || null);
+
+    setImmediate(() => {
+      prewarmTwilioQuestionAudioCache(
+        db,
+        targetSurveyId,
+        farmer?.ownerUserId || null,
+        preferredLanguage || 'english'
+      ).catch((err) => {
+        console.warn('⚠️ Twilio prewarm background task failed:', err?.message || err);
+      });
+    });
+
+    setImmediate(async () => {
+      try {
+        const callResult = await initiateTwilioQuizCall(phoneNumber, targetSurveyId);
+        await sendMessage(phoneNumber, '📞 We are calling you now for the quiz. You can answer by speaking or using keypad numbers.');
+        console.log(`📞 Twilio call initiated for ${phoneNumber}: sid=${callResult.callSid || 'n/a'}`);
+      } catch (callErr) {
+        console.error(`❌ Failed to initiate Twilio call for ${phoneNumber}:`, callErr?.message || callErr);
+        try {
+          await sendMessage(phoneNumber, '⚠️ We could not place the call right now. Please try again in a moment or continue on WhatsApp.');
+        } catch (notifyErr) {
+          console.warn('⚠️ Failed to notify farmer about call initiation failure:', notifyErr?.message || notifyErr);
+        }
+      }
+    });
+
+    return;
+  }
+
+  await sendModeSelectionButtons(phoneNumber, preferredLanguage, true);
+};
+
 /**
  * Send a small two-button interactive message to let new or location-less users choose how they want to continue
  * Options: Audio (voice notes) or Text (typed replies)
@@ -2148,9 +3549,24 @@ const handleActionReply = async (db, phoneNumber, replyId) => {
     if (replyId === 'action_continue') {
       const farmer = await getFarmerByPhone(db, phoneNumber);
       const preferredLanguage = farmer?.preferredLanguage || 'english';
-      const targetSurveyId = normalizeSurveyId(farmer?.lastInvitedSurveyId || DEFAULT_SURVEY_ID);
-      await sendMessage(phoneNumber, `🚀 Continuing in ${preferredLanguage}.`);
-      await startSurvey(db, phoneNumber, farmer, farmer?.region, preferredLanguage, false, targetSurveyId);
+      const continueMsgs = {
+        telugu: '🚀 తెలుగులో కొనసాగుతున్నాము.',
+        hindi: '🚀 हिंदी में जारी रखते हैं।',
+        kannada: '🚀 ಕನ್ನಡದಲ್ಲಿ ಮುಂದುವರಿಯುತ್ತೇವೆ.',
+        english: `🚀 Continuing in ${preferredLanguage}.`,
+      };
+      await sendMessage(phoneNumber, continueMsgs[preferredLanguage] || continueMsgs.english);
+      await sendQuizChannelSelectionButtons(phoneNumber, preferredLanguage);
+      return;
+    }
+
+    if (replyId === 'action_channel_whatsapp') {
+      await handleQuizChannelSelection(db, phoneNumber, 'whatsapp');
+      return;
+    }
+
+    if (replyId === 'action_channel_call') {
+      await handleQuizChannelSelection(db, phoneNumber, 'call');
       return;
     }
 
@@ -2168,7 +3584,8 @@ const handleActionReply = async (db, phoneNumber, replyId) => {
     await sendMessage(phoneNumber, '⚠️ Unsupported action. Please reply START to begin.');
   } catch (error) {
     console.error('❌ Error handling action reply:', error.message);
-    await sendMessage(phoneNumber, '❌ Error processing selection. Please try again.');
+    const errLangAction = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorSelection', errLangAction));
   }
 };
 
@@ -2273,12 +3690,14 @@ const handleModeSelection = async (db, phoneNumber, mode) => {
       await startNewSession(db, phoneNumber, targetSurveyId);
     } catch (err) {
       console.warn('⚠️ Failed to send location question after mode selection:', err.message);
-      await sendMessage(phoneNumber, '⚠️ Failed to send the next question. Please reply START to continue.');
+      const fallbackLang = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+      await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorStarting', fallbackLang));
     }
 
   } catch (err) {
     console.error('❌ Error handling mode selection:', err.message);
-    await sendMessage(phoneNumber, '❌ Failed to set preference. Please try again.');
+    const errLangMode = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorPreference', errLangMode));
   }
 };
 
@@ -2315,7 +3734,13 @@ const handleLanguageSelection = async (db, phoneNumber, langToken) => {
     }
 
     if (alreadySet) {
-      await sendMessage(phoneNumber, `✅ Language already set to ${normalized}.`);
+      const alreadySetMsgs = {
+        telugu: '✅ భాష ఇప్పటికే తెలుగుకు సెట్ అయింది.',
+        hindi: '✅ भाषा पहले से हिंदी पर सेट है।',
+        kannada: '✅ ಭಾಷೆ ಈಗಾಗಲೇ ಕನ್ನಡಕ್ಕೆ ಹೊಂದಿಸಲಾಗಿದೆ.',
+        english: `✅ Language already set to ${normalized}.`,
+      };
+      await sendMessage(phoneNumber, alreadySetMsgs[normalized] || alreadySetMsgs.english);
     } else {
       // Send a localized confirmation message for the selected language
       const confirmations = {
@@ -2328,16 +3753,23 @@ const handleLanguageSelection = async (db, phoneNumber, langToken) => {
       await sendMessage(phoneNumber, `✅ ${msg}`);
     }
 
-    // After language is set, ask the user whether they want Audio or Text (onboarding flow)
+    // After language is set, ask how they want to take the quiz (WhatsApp or Phone Call)
     try {
-      await sendModeSelectionButtons(phoneNumber, normalized, true);
+      await sendQuizChannelSelectionButtons(phoneNumber, normalized);
     } catch (err) {
-      console.error('❌ Failed to send mode selection after language selection:', err.message || err);
-      await sendMessage(phoneNumber, '⚠️ Failed to send mode selection. Please reply with Audio or Text to continue.');
+      console.error('❌ Failed to send channel selection after language selection:', err.message || err);
+      const channelFailMsgs = {
+        telugu: '⚠️ చానల్ ఎంపిక పంపడంలో విఫలమైంది. WHATSAPP లేదా CALL తో రిప్లై ఇవ్వండి.',
+        hindi: '⚠️ चैनल चयन भेजने में विफल। WHATSAPP या CALL से उत्तर दें।',
+        kannada: '⚠️ ಚಾನಲ್ ಆಯ್ಕೆ ಕಳುಹಿಸಲು ವಿಫಲವಾಗಿದೆ. WHATSAPP ಅಥವಾ CALL ಎಂದು ಉತ್ತರಿಸಿ.',
+        english: '⚠️ Failed to send channel choice. Please reply with WHATSAPP or CALL to continue.',
+      };
+      await sendMessage(phoneNumber, channelFailMsgs[normalized] || channelFailMsgs.english);
     }
   } catch (error) {
     console.error('❌ Error handling language selection:', error.message);
-    await sendMessage(phoneNumber, '❌ Error setting language. Please reply START or try again.');
+    const errLangSel = (await getFarmerByPhone(db, phoneNumber).catch(() => null))?.preferredLanguage || 'english';
+    await sendMessage(phoneNumber, getLocalizedSurveyMessage('errorSelection', errLangSel));
   }
 };
 
@@ -2359,6 +3791,25 @@ const EN_NUMBER_WORDS = {
   eight: 8,
   nine: 9,
   ten: 10,
+};
+
+// Localized number words for option matching from STT transcripts
+const LOCALIZED_NUMBER_WORDS = {
+  hindi: {
+    'एक': 1, 'ek': 1, 'दो': 2, 'do': 2, 'तीन': 3, 'teen': 3, 'चार': 4, 'char': 4,
+    'पांच': 5, 'paanch': 5, 'panch': 5, 'छह': 6, 'chhah': 6, 'chhe': 6,
+    'सात': 7, 'saat': 7, 'आठ': 8, 'aath': 8, 'नौ': 9, 'nau': 9, 'दस': 10, 'das': 10,
+  },
+  telugu: {
+    'ఒకటి': 1, 'okati': 1, 'రెండు': 2, 'rendu': 2, 'మూడు': 3, 'moodu': 3, 'నాలుగు': 4, 'nalugu': 4,
+    'ఐదు': 5, 'aidu': 5, 'ఆరు': 6, 'aaru': 6, 'ఏడు': 7, 'edu': 7, 'ఎనిమిది': 8, 'enimidi': 8,
+    'తొమ్మిది': 9, 'tommidi': 9, 'పది': 10, 'padi': 10,
+  },
+  kannada: {
+    'ಒಂದು': 1, 'ondu': 1, 'ಎರಡು': 2, 'eradu': 2, 'ಮೂರು': 3, 'mooru': 3, 'ನಾಲ್ಕು': 4, 'nalku': 4,
+    'ಐದು': 5, 'aidu': 5, 'ಆರು': 6, 'aaru': 6, 'ಏಳು': 7, 'elu': 7, 'ಎಂಟು': 8, 'entu': 8,
+    'ಒಂಬತ್ತು': 9, 'ombattu': 9, 'ಹತ್ತು': 10, 'hattu': 10,
+  },
 };
 
 const extractNumericOptionFromTranscript = (transcript, language, maxOption) => {
@@ -2390,13 +3841,21 @@ const extractNumericOptionFromTranscript = (transcript, language, maxOption) => 
     }
   }
 
+  // Check localized number words (e.g., "ek", "do", "rendu", "ondu", etc.)
+  const langMaps = [LOCALIZED_NUMBER_WORDS[langKey], ...Object.values(LOCALIZED_NUMBER_WORDS)].filter(Boolean);
+  for (const wordMap of langMaps) {
+    for (const [word, num] of Object.entries(wordMap)) {
+      if (text.includes(word) && num <= maxOption) {
+        return num;
+      }
+    }
+  }
+
   return null;
 };
 
-const getLocalizedIndex = (index, language) => {
-  const lang = (language || 'english').toLowerCase();
-  const digits = DIGIT_MAP[lang] || DIGIT_MAP.english;
-  return digits[index] || String(index + 1);
+const getLocalizedIndex = (index) => {
+  return String(index + 1);
 };
 
 const sendLanguagePrompt = async (phoneNumber, language) => {
@@ -2412,6 +3871,13 @@ const buildQuestionPayload = (q, language) => {
   const reply = (REPLY_PROMPT[lang] || REPLY_PROMPT.english).replace('{n}', options.length);
 
   return { text, options, reply, language: lang };
+};
+
+const buildWhatsAppAudioSpokenScript = (question, preferredLanguage = 'english') => {
+  const lang = String(preferredLanguage || 'english').toLowerCase();
+  const questionText = sanitizeTtsText(buildBilingualQuestionText(question, lang), lang);
+  const optionSpeech = buildBilingualOptionsForSpeech(question, lang).join('. ');
+  return `${questionText}. ${optionSpeech}.`;
 };
 
 const formatQuestionForLanguage = (q, language) => {
@@ -2460,7 +3926,13 @@ const sendQuestionMessage = async (db, phoneNumber, q, language) => {
     try {
       const { isTtsEnabled } = await import('../config/featureFlags.js');
       if (!isTtsEnabled()) {
-        const fallbackBodyDisabled = `🔊 ${text}\n\n${options.map((opt, idx) => `${idx + 1}. ${opt}`).join('\n')}\n\n🎙️ Voice replies are currently disabled by the system. Reply with a voice note when enabled or reply with the number to answer.`;
+        const ttsDisabledHint = {
+          telugu: '🎙️ వాయిస్ రిప్లైలు ప్రస్తుతం నిష్క్రియం చేయబడ్డాయి. దయచేసి సంఖ్యతో సమాధానం ఇవ్వండి.',
+          hindi: '🎙️ वॉइस रिप्लाई वर्तमान में अक्षम हैं। कृपया संख्या से उत्तर दें।',
+          kannada: '🎙️ ಧ್ವನಿ ಉತ್ತರಗಳು ಇದೀಗ ನಿಷ್ಕ್ರಿಯಗೆಯಾಗಿವೆ. ದಯವಿಟ್ಟು ಸಂಖ್ಯೆಯೊಂದಿಗೆ ಉತ್ತರಿಸಿ.',
+          english: '🎙️ Voice replies are currently disabled by the system. Reply with the number to answer.',
+        };
+        const fallbackBodyDisabled = `🔊 ${text}\n\n${options.map((opt, idx) => `${idx + 1}. ${opt}`).join('\n')}\n\n${ttsDisabledHint[lang] || ttsDisabledHint.english}`;
         console.log('ℹ️ TTS is disabled via feature flag; sending text fallback');
         await sendMessage(phoneNumber, fallbackBodyDisabled);
         return;
@@ -2469,8 +3941,7 @@ const sendQuestionMessage = async (db, phoneNumber, q, language) => {
       console.warn('⚠️ Could not read TTS feature flag:', err.message || err);
     }
 
-    const spokenOptions = options.map((opt, idx) => `${idx + 1}. ${opt}`).join('. ');
-    const spokenScript = `${text}. ${spokenOptions}`;
+    const spokenScript = buildWhatsAppAudioSpokenScript(q, lang);
 
     let ttsResult = null;
     try {
@@ -2518,7 +3989,13 @@ const sendQuestionMessage = async (db, phoneNumber, q, language) => {
     }
 
     // TTS fallback: if synthesis or send failed, send a plain-text version (no buttons)
-    const fallbackBody = `🔊 ${text}\n\n${options.map((opt, idx) => `${idx + 1}. ${opt}`).join('\n')}\n\n🎙️ Reply with a voice note to answer.`;
+    const voiceHint = {
+      telugu: '🎙️ సమాధానం ఇవ్వడానికి వాయిస్ నోట్ పంపండి.',
+      hindi: '🎙️ उत्तर देने के लिए वॉइस नोट भेजें।',
+      kannada: '🎙️ ಉತ್ತರಿಸಲು ವಾಯ್ಸ್ ನೋಟ್ ಕಳುಹಿಸಿ.',
+      english: '🎙️ Reply with a voice note to answer.',
+    };
+    const fallbackBody = `🔊 ${text}\n\n${options.map((opt, idx) => `${idx + 1}. ${opt}`).join('\n')}\n\n${voiceHint[lang] || voiceHint.english}`;
     await sendMessage(phoneNumber, fallbackBody);
     return;
   }
@@ -2674,9 +4151,7 @@ const sendInteractiveButtons = async (phoneNumber, bodyText, options, footerText
  * Upload a local audio file to WhatsApp media endpoint and return media id
  */
 const uploadMediaToWhatsApp = async (filePath, mimeType) => {
-  const fs = await import('fs');
   const FormData = (await import('form-data')).default;
-  const path = await import('path');
 
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
@@ -2812,7 +4287,7 @@ const sendListMessage = async (phoneNumber, bodyText, options, footerText = '', 
           button: buttonText,
           sections: [
             {
-              title: 'Options',
+              title: SECTION_TITLE[language] || SECTION_TITLE.english,
               rows,
             },
           ],
@@ -2906,9 +4381,15 @@ function normalizePhoneNumber(raw) {
 }
 
 const normalizeRegionLabel = (value) => {
-  if (!value) return 'Unknown';
-  const key = value.toString().trim().toLowerCase();
-  return REGION_DISPLAY_NAMES[key] || value.charAt(0).toUpperCase() + value.slice(1);
+  if (!value) return 'unknown';
+  // Always store regions as lowercase snake_case for consistency
+  return value.toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+};
+
+const getRegionDisplayName = (key) => {
+  if (!key) return 'Unknown';
+  const normalized = key.toString().trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  return REGION_DISPLAY_NAMES[normalized] || key.charAt(0).toUpperCase() + key.slice(1);
 };
 
 const ensureFarmerRegion = async (db, phoneNumber, regionValue) => {

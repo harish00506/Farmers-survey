@@ -10,6 +10,7 @@ import {
   updateQuestionHandler,
   deleteQuestionHandler,
   translateQuestionHandler,
+  updateTranslationsHandler,
   createTransitionHandler,
   listTransitionsHandler,
   deleteTransitionHandler,
@@ -32,6 +33,7 @@ router.post('/questions', requireAdminApiKey, createQuestionHandler);
 router.put('/questions/:id', requireAdminApiKey, updateQuestionHandler);
 router.delete('/questions/:id', requireAdminApiKey, deleteQuestionHandler);
 router.post('/questions/:id/translate', requireAdminApiKey, translateQuestionHandler);
+router.patch('/questions/:id/translations', requireAdminApiKey, updateTranslationsHandler);
 
 // Transitions
 router.post('/transitions', requireAdminApiKey, createTransitionHandler);

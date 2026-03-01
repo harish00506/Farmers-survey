@@ -27,7 +27,7 @@ export const ensureAudioStorageDir = async () => {
 };
 
 const getWhatsAppMediaMeta = async (mediaId) => {
-  const url = `https://graph.facebook.com/v18.0/${mediaId}?fields=url,mime_type,sha256,file_size`;
+  const url = `https://graph.facebook.com/v24.0/${mediaId}?fields=url,mime_type,sha256,file_size`;
   const response = await axios.get(url, {
     headers: {
       Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
@@ -49,7 +49,7 @@ const downloadWhatsAppMedia = async (mediaUrl) => {
 /**
  * Store audio file from WhatsApp and create Audio node
  */
-export const storeAudioFile = async (db, mediaId, metadata = {}) => {
+export const storeAudioFile = async (db, mediaId, metadata = {}, { skipAutoTranscription = false } = {}) => {
   const storagePath = await ensureAudioStorageDir();
   const audioId = `audio_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -80,9 +80,9 @@ export const storeAudioFile = async (db, mediaId, metadata = {}) => {
   const audioCollection = getCollection(db, 'audio');
   await audioCollection.insertOne(audio);
 
-  // If transcription is enabled, kick off transcription asynchronously
-  if (process.env.ENABLE_TRANSCRIPTION === 'true') {
-    // call but don't await
+  // If transcription is enabled AND the caller isn't handling transcription itself,
+  // kick off transcription asynchronously
+  if (process.env.ENABLE_TRANSCRIPTION === 'true' && !skipAutoTranscription) {
     transcribeAudio(db, audio.id).catch((err) => console.error('❌ Transcription job failed:', err.message));
   }
 
@@ -108,7 +108,69 @@ export const transcribeAudio = async (db, audioId, language = null) => {
   await getCollection(db, 'audio').updateOne({ id: audioId }, { $set: { transcriptionStatus: 'pending', transcriptionRequestedAt: new Date() } });
 
   try {
-    const provider = process.env.STT_PROVIDER || 'groq';
+    const provider = process.env.STT_PROVIDER || 'sarvam';
+
+    // ── Sarvam AI (Saaras v3) STT provider ──
+    if (provider === 'sarvam') {
+      const FormData = (await import('form-data')).default;
+      const fsNode = await import('fs');
+      const form = new FormData();
+      form.append('file', fsNode.createReadStream(audio.filePath));
+      form.append('model', process.env.SARVAM_STT_MODEL || 'saaras:v3');
+      form.append('mode', 'transcribe');
+
+      // Map canonical language names → Sarvam BCP-47 codes
+      const SARVAM_LANG_MAP = {
+        telugu: 'te-IN',
+        hindi: 'hi-IN',
+        kannada: 'kn-IN',
+        tamil: 'ta-IN',
+        marathi: 'mr-IN',
+        english: 'en-IN',
+        bengali: 'bn-IN',
+        gujarati: 'gu-IN',
+        malayalam: 'ml-IN',
+        odia: 'od-IN',
+        punjabi: 'pa-IN',
+      };
+      if (language) {
+        const langCode = SARVAM_LANG_MAP[language.toLowerCase()] || language;
+        form.append('language_code', langCode);
+      } else {
+        form.append('language_code', 'unknown');
+      }
+
+      const sarvamKey = process.env.SARVAM_API_KEY;
+      if (!sarvamKey) throw new Error('SARVAM_API_KEY is not configured');
+
+      const sttUrl = process.env.SARVAM_STT_API_URL || 'https://api.sarvam.ai/speech-to-text';
+      const headers = { 'api-subscription-key': sarvamKey, ...form.getHeaders() };
+      const res = await axios.post(sttUrl, form, { headers, timeout: 120000 });
+      const transcriptText = res.data?.transcript || res.data?.text || null;
+
+      if (!transcriptText) {
+        throw new Error('Sarvam STT returned no transcript');
+      }
+
+      const detectedLang = res.data?.language_code || null;
+      const langProb = res.data?.language_probability || null;
+      console.log(`🔉 Sarvam STT (audioId=${audioId}, detectedLang=${detectedLang}, prob=${langProb}):`, transcriptText);
+
+      const transcriptDoc = { text: transcriptText, engine: 'sarvam', createdAt: new Date(), language: language || detectedLang || null };
+      await getCollection(db, 'audio').updateOne({ id: audioId }, { $set: { transcript: transcriptDoc, transcriptionStatus: 'completed' } });
+
+      let matchResult = null;
+      try {
+        matchResult = await matchTranscriptToOptions(db, audioId);
+        if (matchResult) console.log(`🔍 Match result (audioId=${audioId}):`, matchResult);
+      } catch (err) {
+        console.warn('⚠️ Failed to match transcript to options:', err.message);
+      }
+
+      return { ...transcriptDoc, match: matchResult };
+    }
+
+    // ── Groq (Whisper) STT provider ──
     if (provider === 'groq') {
       // call groq/openai-style transcription endpoint
       const FormData = (await import('form-data')).default;
@@ -160,9 +222,9 @@ export const transcribeAudio = async (db, audioId, language = null) => {
       }
 
       return { ...transcriptDoc, match: matchResult };
-    } else {
-      throw new Error('Unsupported STT_PROVIDER: ' + provider);
     }
+
+    throw new Error('Unsupported STT_PROVIDER: ' + provider);
   } catch (err) {
     // Log detailed provider error (status code and response body when available) for debugging
     try {

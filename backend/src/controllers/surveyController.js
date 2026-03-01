@@ -1,6 +1,7 @@
 import * as surveyEngine from '../services/surveyEngine.js';
 import * as translationService from '../services/translationService.js';
 import { getModelByCollection } from '../models/index.js';
+import { synthesizeText } from '../services/ttsService.js';
 
 const SUPPORTED_LANGS = ['telugu', 'hindi', 'kannada', 'marathi', 'tamil'];
 const DEFAULT_SURVEY_ID = 'survey1';
@@ -221,6 +222,20 @@ export const updateQuestionHandler = async (req, res) => {
       }
     }
 
+    // Invalidate all TTS cache for this question (text/options likely changed)
+    try {
+      const audio = getCollection('audio');
+      const del = await audio.deleteMany({
+        questionId: id,
+        source: { $in: ['twilio_tts_question', 'tts'] },
+      });
+      if (del.deletedCount > 0) {
+        console.log(`🗑️ Deleted ${del.deletedCount} stale TTS entries after question update for ${id}`);
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to clear TTS cache after question update:', err.message);
+    }
+
     const updated = await surveyEngine.getQuestionById(req.app.locals.mongoDb, id, ownerUserId, surveyId);
 
     res.json({ success: true, question: updated, translations });
@@ -250,9 +265,144 @@ export const translateQuestionHandler = async (req, res) => {
     const surveyId = req.query.surveyId || req.body?.surveyId || DEFAULT_SURVEY_ID;
     const ownerUserId = req.user?.id;
     const result = await translationService.translateQuestion(req.app.locals.mongoDb, id, languages, ownerUserId, surveyId);
+
+    // Invalidate stale TTS cache for the re-translated languages
+    const changedLangs = languages.map(l => l.trim().toLowerCase()).filter(l => l && l !== 'english');
+    if (changedLangs.length > 0) {
+      try {
+        const audio = getCollection('audio');
+        const del = await audio.deleteMany({
+          questionId: id,
+          lang: { $in: changedLangs },
+          source: { $in: ['twilio_tts_question', 'tts'] },
+        });
+        if (del.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${del.deletedCount} stale TTS entries after AI translate for question ${id}`);
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to clear TTS cache after AI translate:', err.message);
+      }
+    }
+
     res.json({ success: true, translations: result });
   } catch (err) {
     console.error('❌ translateQuestion error:', err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
+};
+
+/**
+ * Manually update (correct) translations for a question.
+ * Accepts body: { translations: { <lang>: { text, options } } }
+ * Does NOT trigger auto-retranslation.
+ */
+export const updateTranslationsHandler = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const surveyId = req.query.surveyId || req.body?.surveyId || DEFAULT_SURVEY_ID;
+    const ownerUserId = req.user?.id;
+    const translations = req.body?.translations;
+
+    if (!translations || typeof translations !== 'object') {
+      return res.status(400).json({ success: false, error: 'translations object is required' });
+    }
+
+    const questions = getCollection('questions');
+    const normalizedSurveyId = normalizeSurveyId(surveyId);
+    const buildSurveyFilter = (sid) => {
+      if (sid === DEFAULT_SURVEY_ID) {
+        return { $or: [{ surveyId: DEFAULT_SURVEY_ID }, { surveyId: { $exists: false } }] };
+      }
+      return { surveyId: sid };
+    };
+    const ownerFilter = ownerUserId ? { ownerUserId } : {};
+    const existing = await questions.findOne({ id, ...ownerFilter, ...buildSurveyFilter(normalizedSurveyId) });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Question not found' });
+    }
+
+    const $set = { updatedAt: new Date() };
+    for (const [lang, data] of Object.entries(translations)) {
+      const normalizedLang = String(lang || '').trim().toLowerCase();
+      if (!normalizedLang || normalizedLang === 'english') continue;
+      if (!SUPPORTED_LANGS.includes(normalizedLang)) continue;
+
+      if (data.text !== undefined) {
+        $set[`text_${normalizedLang}`] = String(data.text || '').trim();
+      }
+      if (Array.isArray(data.options)) {
+        $set[`options_${normalizedLang}`] = data.options.map((o) => String(o ?? '').trim());
+      }
+      $set[`manualTranslation.${normalizedLang}`] = { by: 'user', timestamp: new Date() };
+    }
+
+    await questions.updateOne(
+      { id, ...ownerFilter, ...buildSurveyFilter(normalizedSurveyId) },
+      { $set }
+    );
+
+    const updated = await questions.findOne({ id, ...ownerFilter, ...buildSurveyFilter(normalizedSurveyId) });
+
+    // ── Invalidate & regenerate TTS for every language whose text changed ──
+    const changedLangs = Object.keys(translations)
+      .map(l => l.trim().toLowerCase())
+      .filter(l => l && l !== 'english' && SUPPORTED_LANGS.includes(l));
+
+    if (changedLangs.length > 0 && updated) {
+      const audio = getCollection('audio');
+
+      // Delete old cached TTS entries for the changed languages
+      try {
+        const deleteResult = await audio.deleteMany({
+          questionId: id,
+          lang: { $in: changedLangs },
+          source: { $in: ['twilio_tts_question', 'tts'] },
+        });
+        if (deleteResult.deletedCount > 0) {
+          console.log(`🗑️ Deleted ${deleteResult.deletedCount} stale TTS cache entries for question ${id} langs=[${changedLangs}]`);
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to delete stale TTS cache:', err.message);
+      }
+
+      // Regenerate TTS in the background (don't block the response)
+      setImmediate(async () => {
+        for (const lang of changedLangs) {
+          try {
+            const questionText = updated[`text_${lang}`] || updated.text || '';
+            const localizedOpts = Array.isArray(updated[`options_${lang}`]) ? updated[`options_${lang}`] : (updated.options || []);
+            const optionsScript = localizedOpts.map((opt, i) => `${i + 1}. ${opt}`).join('. ');
+            const spokenScript = `${questionText}. ${optionsScript}.`;
+
+            const format = process.env.TTS_FORMAT || 'mp3';
+            const result = await synthesizeText(spokenScript, { lang, format });
+            if (result) {
+              await audio.insertOne({
+                id: result.audioId,
+                fileName: result.fileName,
+                filePath: result.filePath,
+                mimeType: result.mimeType,
+                fileSize: result.fileSize,
+                source: 'tts',
+                sourceText: spokenScript,
+                lang,
+                questionId: id,
+                surveyId: normalizedSurveyId,
+                createdAt: new Date(),
+                transcriptionStatus: 'not_requested',
+              });
+              console.log(`🔊 Regenerated TTS for question ${id} lang=${lang}`);
+            }
+          } catch (err) {
+            console.warn(`⚠️ TTS regen failed for question ${id} lang=${lang}:`, err.message);
+          }
+        }
+      });
+    }
+
+    res.json({ success: true, question: updated });
+  } catch (err) {
+    console.error('❌ updateTranslations error:', err.message);
     res.status(400).json({ success: false, error: err.message });
   }
 };

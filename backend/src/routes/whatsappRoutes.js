@@ -3,6 +3,10 @@ import multer from 'multer';
 import {
     webhookVerify,
     handleIncomingMessage,
+    twilioVoiceAnswer,
+    twilioVoiceGather,
+    twilioVoiceRecord,
+    twilioVoiceAudioFile,
     sendSurveyInvite,
     sendSurveyInviteUpload,
     getInviteJobStatus,
@@ -23,6 +27,10 @@ const upload = multer({
  */
 webhookRouter.get('/', webhookVerify);
 webhookRouter.post('/', handleIncomingMessage);
+webhookRouter.post('/voice/twilio/answer', twilioVoiceAnswer);
+webhookRouter.post('/voice/twilio/gather', twilioVoiceGather);
+webhookRouter.post('/voice/twilio/record', twilioVoiceRecord);
+webhookRouter.get('/voice/twilio/audio/:audioId', twilioVoiceAudioFile);
 
 /**
  * Internal WhatsApp-related APIs for the admin console or tooling.
