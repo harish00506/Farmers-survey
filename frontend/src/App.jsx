@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import SurveyMonitor from './components/SurveyMonitor';
 import FarmerTracker from './components/FarmerTracker';
+import FarmersDatabaseTab from './components/FarmersDatabaseTab';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import AIChatPanel from './components/AIChatPanel';
 import QCAudioPanel from './components/QCAudioPanel';
@@ -14,6 +15,129 @@ import {
   setAuthToken,
   setAuthUser,
 } from './lib/authStorage';
+
+function AppIcon({ name, className = '' }) {
+  const common = {
+    fill: 'none',
+    viewBox: '0 0 24 24',
+    strokeWidth: 1.8,
+    stroke: 'currentColor',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    className: `app-icon ${className}`.trim(),
+    'aria-hidden': 'true',
+  };
+
+  if (name === 'menu') {
+    return (
+      <svg {...common}>
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </svg>
+    );
+  }
+
+  if (name === 'brand') {
+    return (
+      <svg {...common}>
+        <path d="M12 3v18" />
+        <path d="M6 8c3-2 9-2 12 0-3 2-9 2-12 0Z" />
+        <path d="M5 14c2.5-1.5 11.5-1.5 14 0-2.5 1.5-11.5 1.5-14 0Z" />
+      </svg>
+    );
+  }
+
+  if (name === 'monitor') {
+    return (
+      <svg {...common}>
+        <path d="M4 4h16v13H4z" />
+        <path d="m8 13 2.5-2.5 2 2 3.5-4" />
+        <path d="M10 20h4" />
+      </svg>
+    );
+  }
+
+  if (name === 'users') {
+    return (
+      <svg {...common}>
+        <path d="M16 21v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1" />
+        <circle cx="9.5" cy="8" r="3" />
+        <path d="M22 21v-1a4 4 0 0 0-3-3.87" />
+        <path d="M16 4.13a3 3 0 0 1 0 5.74" />
+      </svg>
+    );
+  }
+
+  if (name === 'database') {
+    return (
+      <svg {...common}>
+        <ellipse cx="12" cy="5" rx="7" ry="3" />
+        <path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5" />
+        <path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+      </svg>
+    );
+  }
+
+  if (name === 'reports') {
+    return (
+      <svg {...common}>
+        <path d="M4 20h16" />
+        <path d="M7 16V9" />
+        <path d="M12 16V5" />
+        <path d="M17 16v-4" />
+      </svg>
+    );
+  }
+
+  if (name === 'ai') {
+    return (
+      <svg {...common}>
+        <rect x="7" y="7" width="10" height="10" rx="2" />
+        <path d="M4 10h3M4 14h3M17 10h3M17 14h3M10 4v3M14 4v3M10 17v3M14 17v3" />
+      </svg>
+    );
+  }
+
+  if (name === 'edit') {
+    return (
+      <svg {...common}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" />
+      </svg>
+    );
+  }
+
+  if (name === 'logout') {
+    return (
+      <svg {...common}>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="m16 17 5-5-5-5" />
+        <path d="M21 12H9" />
+      </svg>
+    );
+  }
+
+  if (name === 'delete') {
+    return (
+      <svg {...common}>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v6M14 11v6" />
+      </svg>
+    );
+  }
+
+  if (name === 'user') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
+      </svg>
+    );
+  }
+
+  return null;
+}
 
 function KPI({ title, metric, isAllTime = false }) {
   const arrow = metric.trend === 'up' ? '▲' : metric.trend === 'down' ? '▼' : '–';
@@ -59,6 +183,44 @@ function App() {
   const isAuthenticated = Boolean(currentUser);
   const activeSurveyName = String(currentUser?.surveyName || '').trim();
   const requiresSurveyName = isAuthenticated && !activeSurveyName;
+  const navItems = [
+    {
+      id: 'monitor',
+      icon: 'monitor',
+      title: 'Survey Status',
+      description: 'Track live responses',
+    },
+    {
+      id: 'farmers',
+      icon: 'users',
+      title: 'Send Surveys',
+      description: 'Target and invite farmers',
+    },
+    {
+      id: 'farmers-db',
+      icon: 'database',
+      title: 'Farmer List',
+      description: 'View all farmer records',
+    },
+    {
+      id: 'analytics',
+      icon: 'reports',
+      title: 'Reports',
+      description: 'See trends and outcomes',
+    },
+    {
+      id: 'chat',
+      icon: 'ai',
+      title: 'Ask AI',
+      description: 'Ask questions about data',
+    },
+    {
+      id: 'editor',
+      icon: 'edit',
+      title: 'Survey Setup',
+      description: 'Manage questions and flow',
+    },
+  ];
 
   useEffect(() => {
     restoreSession();
@@ -220,7 +382,7 @@ function App() {
       <div className="auth-shell">
         <form className="auth-card" onSubmit={submitAuth}>
           <div className="auth-header-block">
-            <span className="auth-badge">🌾 Survey Platform</span>
+            <span className="auth-badge"><AppIcon name="brand" className="auth-badge-icon" /> Survey Platform</span>
             <h2>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h2>
             <p className="auth-subtitle">Login or create account to access survey dashboard.</p>
           </div>
@@ -267,19 +429,30 @@ function App() {
     <div className="app-container layout">
       <header className="app-header top-header">
         <div className="header-left">
-          <button className="hamburger" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle navigation">☰</button>
-          <div>
-            <h1>🌾 {activeSurveyName || 'Survey Analytics'}</h1>
-            <p className="subtitle">AI-enabled WhatsApp survey management platform</p>
+          <button className="hamburger" onClick={() => setSidebarOpen((s) => !s)} aria-label="Toggle navigation">
+            <AppIcon name="menu" />
+          </button>
+          <div className="brand-block">
+            <span className="brand-icon" aria-hidden="true">
+              <AppIcon name="brand" />
+            </span>
+            <div className="brand-text">
+              <h1>{activeSurveyName || 'Survey Analytics'}</h1>
+              <p className="subtitle">AI-enabled WhatsApp survey management platform</p>
+            </div>
           </div>
         </div>
         <div className="header-right">
           <ThemeToggle />
-          <span className="user-chip">{currentUser?.email}</span>
-          <button type="button" onClick={logout}>Logout</button>
-          <button type="button" className="btn-danger" onClick={deleteAccount} disabled={deleteAccountBusy}>
-            {deleteAccountBusy ? 'Deleting...' : 'Delete Account'}
+          <span className="user-chip"><AppIcon name="user" /> <span>{currentUser?.email}</span></span>
+          <button type="button" className="header-action-btn" onClick={logout}>
+            <AppIcon name="logout" />
+            <span>Logout</span>
           </button>
+          {/* <button type="button" className="btn-danger header-action-btn" onClick={deleteAccount} disabled={deleteAccountBusy}>
+            <AppIcon name="delete" />
+            {deleteAccountBusy ? 'Deleting...' : 'Delete Account'}
+          </button> */}
           <span className={`env-badge ${env === 'production' ? 'prod' : 'dev'}`}>
             {env === 'production' ? (
               <img src="/logo.png" alt="Production" className="env-logo" />
@@ -306,19 +479,28 @@ function App() {
 
       <div className="app-body">
         <aside className={`app-sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>
-          <nav>
-            <button className={`nav-link ${activeTab === 'monitor' ? 'active' : ''}`} onClick={() => setActiveTab('monitor')}>📊 <span className="label">Survey Monitor</span></button>
-            <button className={`nav-link ${activeTab === 'farmers' ? 'active' : ''}`} onClick={() => setActiveTab('farmers')}>👥 <span className="label">Respondent Tracker</span></button>
-            <button className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>📈 <span className="label">Analytics</span></button>
-            <button className={`nav-link ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>🤖 <span className="label">Chat with Data</span></button>
-            <button className={`nav-link ${activeTab === 'editor' ? 'active' : ''}`} onClick={() => setActiveTab('editor')}>✏️ <span className="label">Survey Editor</span></button>
-            {/* <button className={`nav-link ${activeTab === 'recorder' ? 'active' : ''}`} onClick={() => setActiveTab('recorder')}>🎤 <span className="label">Recorder</span></button> */}
+          <nav className="sidebar-nav" aria-label="Main navigation">
+            <p className="nav-section-title">Main Menu</p>
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-link ${activeTab === item.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(item.id)}
+              >
+                <span className="nav-link-icon" aria-hidden="true"><AppIcon name={item.icon} /></span>
+                <span className="nav-link-text">
+                  <span className="label nav-link-title">{item.title}</span>
+                  <span className="nav-link-description">{item.description}</span>
+                </span>
+              </button>
+            ))}
           </nav>
         </aside>
 
         <main className="app-main">
           {activeTab === 'monitor' && <SurveyMonitor />}
           {activeTab === 'farmers' && <FarmerTracker />}
+          {activeTab === 'farmers-db' && <FarmersDatabaseTab />}
           {activeTab === 'analytics' && <AnalyticsDashboard />}
           {activeTab === 'chat' && <AIChatPanel />}
           {activeTab === 'editor' && <QuestionsEditor />}

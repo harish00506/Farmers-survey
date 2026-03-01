@@ -37,15 +37,8 @@ export default function SurveyInvitePanel() {
   const [qrPayload, setQrPayload] = useState(null);
   const [copied, setCopied] = useState(false);
   const [bulkJobId, setBulkJobId] = useState(null);
-  const [followupLoading, setFollowupLoading] = useState(false);
   const [inviteSurveyId, setInviteSurveyId] = useState('survey1');
-  const [sourceSurveyId, setSourceSurveyId] = useState('survey1');
-  const [sourceQuestionId, setSourceQuestionId] = useState('Q1');
-  const [sourceOption, setSourceOption] = useState('Rice');
-  const [targetSurveyId, setTargetSurveyId] = useState('survey2');
-  const [forceRetrigger, setForceRetrigger] = useState(false);
   const [surveys, setSurveys] = useState([]);
-  const [sourceQuestions, setSourceQuestions] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,23 +51,10 @@ export default function SurveyInvitePanel() {
 
         setSurveys(docs);
 
-        setSourceSurveyId((prev) => {
-          if (docs.length === 0) return prev;
-          const exists = docs.some((survey) => survey.id === prev);
-          return exists ? prev : docs[0].id;
-        });
-
         setInviteSurveyId((prev) => {
           if (docs.length === 0) return prev;
           const exists = docs.some((survey) => survey.id === prev);
           return exists ? prev : docs[0].id;
-        });
-
-        setTargetSurveyId((prev) => {
-          if (docs.length === 0) return prev;
-          const exists = docs.some((survey) => survey.id === prev);
-          if (exists) return prev;
-          return docs.length > 1 ? docs[1].id : docs[0].id;
         });
       } catch {
         if (cancelled) return;
@@ -88,54 +68,6 @@ export default function SurveyInvitePanel() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!sourceSurveyId) {
-      setSourceQuestions([]);
-      return;
-    }
-
-    let cancelled = false;
-    const loadSourceQuestions = async () => {
-      try {
-        const response = await axios.get('/api/survey/questions', { params: { surveyId: sourceSurveyId } });
-        const questions = Array.isArray(response.data?.questions) ? response.data.questions : [];
-        if (cancelled) return;
-
-        setSourceQuestions(questions);
-
-        const currentQuestion = questions.find((question) => question.id === sourceQuestionId);
-        if (!currentQuestion && questions.length > 0) {
-          const nextQuestion = questions[0];
-          setSourceQuestionId(nextQuestion.id);
-          const nextOption = Array.isArray(nextQuestion.options) && nextQuestion.options.length > 0 ? String(nextQuestion.options[0]) : '';
-          setSourceOption(nextOption);
-          return;
-        }
-
-        if (currentQuestion) {
-          const options = Array.isArray(currentQuestion.options) ? currentQuestion.options.map((option) => String(option)) : [];
-          if (options.length > 0 && !options.includes(sourceOption)) {
-            setSourceOption(options[0]);
-          }
-        }
-      } catch {
-        if (cancelled) return;
-        setSourceQuestions([]);
-      }
-    };
-
-    loadSourceQuestions();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sourceSurveyId, sourceQuestionId, sourceOption]);
-
-  const selectedSourceQuestion = sourceQuestions.find((question) => question.id === sourceQuestionId) || null;
-  const sourceOptions = Array.isArray(selectedSourceQuestion?.options)
-    ? selectedSourceQuestion.options.map((option) => String(option))
-    : [];
 
   useEffect(() => {
     if (!bulkJobId) return undefined;
@@ -313,41 +245,14 @@ export default function SurveyInvitePanel() {
     }
   };
 
-  const handleTriggerFollowup = async () => {
-    setStatus(null);
-    setFollowupLoading(true);
-    try {
-      const payload = {
-        sourceSurveyId: sourceSurveyId.trim() || 'survey1',
-        sourceQuestionId: sourceQuestionId.trim() || 'Q1',
-        sourceOption: sourceOption.trim() || 'Rice',
-        targetSurveyId: targetSurveyId.trim() || 'survey2',
-        forceRetrigger,
-      };
-
-      const response = await axios.post('/api/whatsapp/trigger-followup', payload);
-      const data = response.data || {};
-      setStatus({
-        type: data.failed > 0 ? 'error' : 'success',
-        message: `Follow-up trigger finished. Eligible: ${data.eligibleCount || 0}, Started: ${data.started || 0}, Skipped active: ${data.skippedActive || 0}, Skipped existing: ${data.skippedExistingTarget || 0}, Failed: ${data.failed || 0}.${data.forceRetrigger ? ' (Force retrigger ON)' : ''}`,
-      });
-    } catch (error) {
-      const message = toErrorMessage(error, 'Failed to trigger follow-up survey.');
-      setStatus({ type: 'error', message });
-    } finally {
-      setFollowupLoading(false);
-    }
-  };
-
   return (
     <div className="card invite-card">
       <div className="invite-hero">
         <div>
           <p className="tone">⚡ Field-to-chat dispatch</p>
-          <h2>Seed the quiz instantly</h2>
+          <h2>Invite Farmers</h2>
           <p>
-            Launch a WhatsApp handshake by dialing a number or letting farmers scan a bespoke QR. They can
-            then tap the option numbers to answer each question.
+            Send single or bulk WhatsApp invites, or generate a QR invite link for farmers.
           </p>
         </div>
         {/* <span className="invite-badge">Phase 1</span> */}
@@ -449,70 +354,6 @@ export default function SurveyInvitePanel() {
           </p>
         </div>
       </form>
-
-      <div className="form-grid" style={{ marginTop: '1rem' }}>
-        <label htmlFor="source-survey-id">Source survey ID</label>
-        <select id="source-survey-id" value={sourceSurveyId} onChange={(event) => setSourceSurveyId(event.target.value)}>
-          {surveys.length === 0 ? (
-            <option value="survey1">survey1</option>
-          ) : surveys.map((survey) => (
-            <option key={survey.id} value={survey.id}>{survey.name || survey.id}</option>
-          ))}
-        </select>
-
-        <label htmlFor="source-question-id">Source question ID</label>
-        <select
-          id="source-question-id"
-          value={sourceQuestionId}
-          onChange={(event) => {
-            const nextQuestionId = event.target.value;
-            setSourceQuestionId(nextQuestionId);
-            const question = sourceQuestions.find((item) => item.id === nextQuestionId);
-            const firstOption = Array.isArray(question?.options) && question.options.length > 0 ? String(question.options[0]) : '';
-            setSourceOption(firstOption);
-          }}
-        >
-          {sourceQuestions.length === 0 ? (
-            <option value="Q1">Q1</option>
-          ) : sourceQuestions.map((question) => (
-            <option key={question.id} value={question.id}>{`${question.id} — ${question.text || ''}`}</option>
-          ))}
-        </select>
-
-        <label htmlFor="source-option">Source option text</label>
-        <select id="source-option" value={sourceOption} onChange={(event) => setSourceOption(event.target.value)}>
-          {sourceOptions.length === 0 ? (
-            <option value="">No options</option>
-          ) : sourceOptions.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-
-        <label htmlFor="target-survey-id">Target survey ID</label>
-        <select id="target-survey-id" value={targetSurveyId} onChange={(event) => setTargetSurveyId(event.target.value)}>
-          {surveys.length === 0 ? (
-            <option value="survey2">survey2</option>
-          ) : surveys.map((survey) => (
-            <option key={survey.id} value={survey.id}>{survey.name || survey.id}</option>
-          ))}
-        </select>
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <input
-            type="checkbox"
-            checked={forceRetrigger}
-            onChange={(event) => setForceRetrigger(event.target.checked)}
-          />
-          Force retrigger even if user already has target-survey answers
-        </label>
-
-        <div className="form-footer">
-          <button type="button" onClick={handleTriggerFollowup} disabled={followupLoading}>
-            {followupLoading ? 'Triggering follow-up...' : 'Trigger Follow-up Survey'}
-          </button>
-          <p className="helper-note">Manual trigger: sends target survey only to users who matched the source answer.</p>
-        </div>
-      </div>
 
       {status && (
         <div className={`status ${status.type === 'error' ? 'error' : 'success'}`}>

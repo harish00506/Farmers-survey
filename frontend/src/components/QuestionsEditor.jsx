@@ -4,6 +4,7 @@ import QuestionList from './QuestionList';
 import QuestionForm from './QuestionForm';
 import FlowVisualizer from './FlowVisualizer';
 import TransitionSimulator from './TransitionSimulator';
+import TranslationEditor from './TranslationEditor';
 
 const API_ROOT = import.meta.env.VITE_API_ROOT || 'http://localhost:3000';
 
@@ -20,17 +21,18 @@ export default function QuestionsEditor() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [editingTranslations, setEditingTranslations] = useState(null);
   const [editorView, setEditorView] = useState('catalog');
 
   // close modal on ESC when editing
   useEffect(() => {
-    if (!editing) return;
+    if (!editing && !editingTranslations) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') setEditing(null);
+      if (e.key === 'Escape') { setEditing(null); setEditingTranslations(null); }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [editing]);
+  }, [editing, editingTranslations]);
 
   const loadSurveys = useCallback(async () => {
     try {
@@ -439,6 +441,37 @@ export default function QuestionsEditor() {
           </div>
         </div>
       )}
+
+      {editorView === 'editor' && editingTranslations && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingTranslations(null); }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div style={{ background: '#fff', padding: 20, borderRadius: 8, minWidth: 740, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', position: 'relative' }}>
+            <button onClick={() => setEditingTranslations(null)} aria-label="Close" style={{ position: 'absolute', top: 8, right: 8 }}>×</button>
+            <h3 style={{ marginTop: 0 }}>Edit Translations — {editingTranslations.id}</h3>
+            <TranslationEditor
+              question={editingTranslations}
+              surveyId={selectedSurveyId}
+              onClose={() => setEditingTranslations(null)}
+              onSaved={() => { loadQuestions(selectedSurveyId); }}
+            />
+          </div>
+        </div>
+      )}
       {editorView === 'editor' && loading && <div>Loading…</div>}
       {editorView === 'editor' && error && <div className="error">{error}</div>}
       {editorView === 'editor' && (
@@ -449,6 +482,7 @@ export default function QuestionsEditor() {
           onRefresh={loadQuestions}
           onPlayTTS={onPlayTTS}
           onReorder={onReorder}
+          onEditTranslations={(q) => setEditingTranslations(q)}
         />
       )}
     </div>

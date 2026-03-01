@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import Skeleton, { Line } from './ui/Skeleton';
+import SectionTitle from './ui/SectionTitle';
 
 const renderInlineMarkup = (text, keyPrefix) => {
   if (!text) return text;
@@ -252,7 +253,7 @@ export default function AIChatPanel() {
   return (
     <div>
       <div className="card chat-wrapper">
-        <h2>🤖 Chat with Survey Data</h2>
+        <SectionTitle icon="chat" title="Chat with Survey Data" />
         <p style={{ color: '#7f8c8d', marginBottom: '1rem' }}>
           Ask questions about farmer survey data.
         </p>
@@ -314,7 +315,7 @@ export default function AIChatPanel() {
       </div>
 
       <div className="card">
-        <h2>💡 Example Queries </h2>
+        <SectionTitle icon="queries" title="Example Queries" />
         <ul style={{ lineHeight: '2' }}>
           <li>📌 "Show seed usage by region"</li>
           <li>📌 "Which regions use the most fertilizer?"</li>

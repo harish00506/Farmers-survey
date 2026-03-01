@@ -126,7 +126,17 @@ npm run dev      # development with nodemon
 - `AUDIO_STORAGE_PATH` (default: ./audio_storage)
 - `ENABLE_TRANSCRIPTION` (default: false) — set to `true` to enable STT job scheduling
 - `STT_PROVIDER` — choose `groq` (default) or another provider
-- `TTS_PROVIDER` — choose the TTS provider to use for outgoing audio: `elevenlabs` or `none`. When set to `elevenlabs`, also set `ELEVENLABS_API_KEY` and optionally `ELEVENLABS_VOICE_ID`.
+- `TTS_PROVIDER` — choose the TTS provider to use for outgoing audio: `elevenlabs`, `mms-tts-tel`, `mms-tts-tel-local`, or `none`.
+- `TTS_HF_MODEL` — Hugging Face TTS model id when using `mms-tts-tel` (default: `facebook/mms-tts-tel`).
+- `TTS_HF_MODEL_TELUGU`, `TTS_HF_MODEL_HINDI`, `TTS_HF_MODEL_KANNADA`, `TTS_HF_MODEL_ENGLISH` — optional language-specific remote MMS models (defaults: `facebook/mms-tts-tel`, `facebook/mms-tts-hin`, `facebook/mms-tts-kan`, `facebook/mms-tts-eng`).
+- `HUGGINGFACE_API_KEY` — Hugging Face API token for `mms-tts-tel` (recommended for reliability/rate limits).
+- `TTS_HF_API_BASE` — Hugging Face inference base URL (default: `https://router.huggingface.co/hf-inference/models`).
+- `TTS_LOCAL_MODEL` — local model id for `mms-tts-tel-local` (default: `facebook/mms-tts-tel`).
+- `TTS_LOCAL_MODEL_TELUGU`, `TTS_LOCAL_MODEL_HINDI`, `TTS_LOCAL_MODEL_KANNADA`, `TTS_LOCAL_MODEL_ENGLISH` — optional language-specific local MMS models with the same defaults as above.
+- `TTS_LOCAL_PYTHON_BIN` — python executable used by local TTS runner (default: `python`).
+- `TTS_LOCAL_SCRIPT_PATH` — path to local runner script (default: `./tools/mms_tts_local_run.py`).
+- `TTS_FORMAT` — preferred output format for outbound TTS. Use `opus` (or Opus-in-OGG) for WhatsApp media compatibility.
+- When `TTS_PROVIDER=elevenlabs`, also set `ELEVENLABS_API_KEY` and optionally `ELEVENLABS_VOICE_ID`.
 - `TTS_TIMEOUT_MS` — request timeout for TTS provider (ms)
 - `AUDIO_RETENTION_DAYS` — number of days to keep audio files (default: 30)
 - `GROQ_API_KEY` (for AI chat)
@@ -252,6 +262,46 @@ Admin endpoints are protected via `ADMIN_API_KEY` (send via header `x-admin-api-
 
 Frontend:
 - `Survey Editor` route available in the app navigation for admins to add/edit questions and manage flows.
+
+---
+
+## Farmers Database & Targeting APIs
+
+Use these endpoints to maintain a farmer phone database, import from CSV, filter by answered questions, and trigger other surveys to matched farmers.
+
+- `GET /api/farmers` — list farmers
+- `GET /api/farmers/:phone` — get farmer details (latest session + answers)
+- `DELETE /api/farmers/:phone` — delete farmer and related records
+- `POST /api/farmers/import/csv` — import farmers from CSV (`multipart/form-data` file field `file`) or JSON body `{ "csvText": "..." }`
+- `GET /api/farmers/filter` — filter farmers by answer
+   - query params: `sourceSurveyId` (or `surveyId`), `sourceQuestionId` (or `questionId`), optional `selectedOption`, optional `selectedOptionIndex`, optional `limit`
+- `POST /api/farmers/filter/query` — multi-level filtering
+   - body: `{ mode: "all"|"any", filters: [{ sourceSurveyId, sourceQuestionId, selectedOption?, selectedOptionIndex? }], limit? }`
+- `POST /api/farmers/filter/send-survey` — send another survey to filtered farmers
+   - body: `{ mode: "all"|"any", filters: [...], targetSurveyId, async?, dryRun?, limit? }`
+
+Example CSV (with header):
+
+```csv
+phone_number,language,region
++919876543210,telugu,telangana
++919876543211,hindi,bihar
+```
+
+Example filter + send request body:
+
+```json
+{
+   "mode": "all",
+   "filters": [
+      { "sourceSurveyId": "survey1", "sourceQuestionId": "Q1", "selectedOption": "Rice" },
+      { "sourceSurveyId": "survey1", "sourceQuestionId": "Q4", "selectedOption": "Yes" }
+   ],
+   "targetSurveyId": "survey2",
+   "async": true,
+   "dryRun": false
+}
+```
 
 ---
 

@@ -1,9 +1,11 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import axios from 'axios';
 import SurveyInvitePanel from './SurveyInvitePanel';
+import FarmersTargetingPanel from './FarmersTargetingPanel';
 import ErrorBanner from './ui/ErrorBanner';
 import EmptyState from './ui/EmptyState';
 import { Line } from './ui/Skeleton';
+import SectionTitle from './ui/SectionTitle';
 
 export default function FarmerTracker() {
   const [farmers, setFarmers] = useState([]);
@@ -32,7 +34,7 @@ export default function FarmerTracker() {
         setLoading(true);
       }
 
-      const res = await axios.get('http://localhost:3000/api/farmers');
+      const res = await axios.get('/api/farmers');
       setFarmers(res.data.farmers || []);
       setError(null);
     } catch (err) {
@@ -61,7 +63,7 @@ export default function FarmerTracker() {
 
   const handleView = async (farmer) => {
     try {
-      const res = await axios.get(`http://localhost:3000/api/farmers/${encodeURIComponent(farmer.phone)}`);
+      const res = await axios.get(`/api/farmers/${encodeURIComponent(farmer.phone)}`);
       setSelectedFarmer(res.data.farmer || farmer);
     } catch (err) {
       console.error('Failed to fetch farmer details', err);
@@ -80,7 +82,7 @@ export default function FarmerTracker() {
 
     try {
       setDeletingPhone(phone);
-      await axios.delete(`http://localhost:3000/api/farmers/${encodeURIComponent(phone)}`);
+      await axios.delete(`/api/farmers/${encodeURIComponent(phone)}`);
       setFarmers((prev) => prev.filter((farmer) => farmer.phone !== phone));
       if (selectedFarmer?.phone === phone) {
         setSelectedFarmer(null);
@@ -124,8 +126,9 @@ export default function FarmerTracker() {
   return (
     <div>
       <SurveyInvitePanel />
+      <FarmersTargetingPanel />
       <div className="card">
-        <h2>👨‍🌾 Farmer Management</h2>
+        <SectionTitle icon="users" title="Farmer Management" />
         <p style={{ color: '#7f8c8d', marginBottom: '1rem' }}>
           Track individual farmer participation and progress
         </p>
@@ -238,7 +241,7 @@ export default function FarmerTracker() {
 
       {selectedFarmer && (
         <div className="card">
-          <h2>👨‍🌾 Farmer Details</h2>
+          <SectionTitle icon="users" title="Farmer Details" />
           <p><strong>Phone:</strong> {selectedFarmer.phone}</p>
           <p><strong>Language:</strong> {selectedFarmer.language}</p>
           <p><strong>Survey:</strong> {selectedFarmer.surveyId || selectedFarmer.session?.surveyId || '-'}</p>
@@ -267,7 +270,7 @@ export default function FarmerTracker() {
       )}
 
       <div className="card">
-        <h2>🎯 Quality Metrics</h2>
+        <SectionTitle icon="quality" title="Quality Metrics" />
         <div className="card-grid">
           <div className="stat-box" style={{ background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)' }}>
             <h3>{farmers.length}</h3>

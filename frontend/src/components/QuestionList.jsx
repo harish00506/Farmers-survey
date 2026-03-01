@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-export default function QuestionList({ questions = [], onEdit = () => { }, onDelete = () => { }, onReorder = () => { } }) {
+export default function QuestionList({ questions = [], onEdit = () => { }, onDelete = () => { }, onReorder = () => { }, onEditTranslations = () => { } }) {
   const [draggingId, setDraggingId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
 
@@ -93,8 +93,8 @@ export default function QuestionList({ questions = [], onEdit = () => { }, onDel
 
             <td>
               <button onClick={() => onEdit(q)}>Edit</button>
+              <button onClick={() => onEditTranslations(q)} style={{ marginLeft: 8 }} title="Edit translations">🌐 Translations</button>
               <button onClick={() => onDelete(q.id)} style={{ marginLeft: 8 }}>Delete</button>
-              {/* <button onClick={() => onPlayTTS(q)} style={{ marginLeft: 8 }}>Play TTS</button> */}
             </td>
           </tr>
         ))}
